@@ -1,0 +1,13 @@
+# Web framework
+fastapi==0.110.0
+uvicorn==0.29.0
+
+# Baza danych i ORM (najlepszy duet do FastAPI)
+sqlalchemy==2.0.29
+psycopg2-binary==2.9.9
+
+# Logika PKI (generowanie kluczy i certyfikatów)
+cryptography==42.0.5
+
+# Zmienne środowiskowe (.env)
+python-dotenv==1.0.1

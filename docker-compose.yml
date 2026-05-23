@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: pki-db
+    environment:
+      POSTGRES_USER: pki_admin
+      POSTGRES_PASSWORD: pki_password
+      POSTGRES_DB: pki_database
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql # Skrypt wykona się automatycznie przy 1. uruchomieniu
+
+  backend:
+    build:
+      context: ./backend
+    container_name: pki-backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://pki_admin:pki_password@db:5432/pki_database
+    volumes:
+      - ./backend:/app # Umożliwia live-reload kodu
+      - certs_data:/app/certs # Mapowanie certów, żeby nie znikały z kontenera
+    depends_on:
+      - db
+
+volumes:
+  pgdata:
+  certs_data:
