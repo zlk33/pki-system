@@ -28,6 +28,20 @@ services:
     depends_on:
       - db
 
+  frontend:
+    image: node:20-alpine
+    container_name: pki-frontend
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+    command: npm run dev
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+
 volumes:
   pgdata:
   certs_data:
