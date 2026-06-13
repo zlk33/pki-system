@@ -101,153 +101,207 @@ export default function Certificates() {
   }
 
   return (
-    <div className="card">
-      <div className="page-header" style={{ marginBottom: 16 }}>
-        <h2>Lista wszystkich certyfikatów w systemie</h2>
-        <p>Przegląd aktywnych i unieważnionych certyfikatów zapisanych w bazie.</p>
+    <div>
+      <div className="page-header">
+        <h2>Certyfikaty</h2>
+        <p>Lista wszystkich certyfikatów w systemie.</p>
       </div>
 
       {msg && <div className="alert alert-success">{msg}</div>}
       {error && <div className="alert alert-error">{error}</div>}
 
-      {loading ? (
-        <p>Ładowanie...</p>
-      ) : certs.length === 0 ? (
-        <div className="empty-state">
-          <p>Brak certyfikatów w systemie.</p>
-        </div>
-      ) : (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Common Name</th>
-                <th>Organizacja</th>
-                <th>Typ</th>
-                <th>Status</th>
-                <th>Ważny od</th>
-                <th>Ważny do</th>
-                <th>Akcje</th>
-              </tr>
-            </thead>
-            <tbody>
-              {certs.map((c) => (
-                <tr key={c.id}>
-                  <td>
-                    <div>{c.common_name || '—'}</div>
-                    <div className="mono">{c.serial_number}</div>
-                  </td>
-                  <td>{c.organization || '—'}</td>
-                  <td>
-                    <span className={`badge badge-${String(c.type).toLowerCase()}`}>{c.type}</span>
-                  </td>
-                  <td>
-                    <span className={`badge badge-${String(c.status).toLowerCase()}`}>{c.status}</span>
-                    {c.status === 'REVOKED' && c.revoked_at ? (
-                      <div className="mono" style={{ marginTop: 6 }}>
-                        {new Date(c.revoked_at).toLocaleString('pl-PL')}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td>{c.not_before ? new Date(c.not_before).toLocaleDateString('pl-PL') : '—'}</td>
-                  <td>{c.not_after ? new Date(c.not_after).toLocaleDateString('pl-PL') : '—'}</td>
-                  <td>
-                    <div className="actions-inline">
-                      <button className="btn btn-secondary" onClick={() => openDetails(c)} disabled={detailsLoading}>
-                        Szczegóły
-                      </button>
-                      <button className="btn btn-ghost" onClick={() => downloadPem(c)}>
-                        Pobierz PEM
-                      </button>
-                      {c.status === 'VALID' && c.type !== 'ROOT' ? (
-                        <button className="btn btn-danger" onClick={() => openRevoke(c)}>
-                          Unieważnij
-                        </button>
-                      ) : null}
-                    </div>
-                  </td>
+      <div className="card" style={{ padding: 0 }}>
+        {loading ? (
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Ładowanie...</div>
+        ) : certs.length === 0 ? (
+          <div className="empty-state">
+            <p>Brak certyfikatów w systemie.</p>
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Common Name</th>
+                  <th>Organizacja</th>
+                  <th>Typ</th>
+                  <th>Status</th>
+                  <th>Ważny od</th>
+                  <th>Ważny do</th>
+                  <th>Akcje</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {certs.map((c) => (
+                  <tr key={c.id}>
+                    <td>
+                      <div style={{ fontWeight: 500 }}>{c.common_name || '—'}</div>
+                      <div className="mono">{c.serial_number}</div>
+                    </td>
+                    <td style={{ color: 'var(--text-muted)' }}>{c.organization || '—'}</td>
+                    <td>
+                      <span className={`badge badge-${String(c.type).toLowerCase()}`}>{c.type}</span>
+                    </td>
+                    <td>
+                      <span className={`badge badge-${String(c.status).toLowerCase()}`}>{c.status}</span>
+                    </td>
+                    <td style={{ color: 'var(--text-muted)' }}>
+                      {c.not_before ? new Date(c.not_before).toLocaleDateString('pl-PL') : '—'}
+                    </td>
+                    <td style={{ color: 'var(--text-muted)' }}>
+                      {c.not_after ? new Date(c.not_after).toLocaleDateString('pl-PL') : '—'}
+                    </td>
+                    <td>
+                      <div className="actions" style={{ gap: 8, flexWrap: 'wrap' }}>
+                        <button
+                          className="btn btn-ghost"
+                          style={{ fontSize: 12, padding: '6px 12px' }}
+                          onClick={() => openDetails(c)}
+                          disabled={detailsLoading}
+                        >
+                          Szczegóły
+                        </button>
+                        <button
+                          className="btn btn-ghost"
+                          style={{ fontSize: 12, padding: '6px 12px' }}
+                          onClick={() => downloadPem(c)}
+                        >
+                          Pobierz PEM
+                        </button>
+                        {c.status === 'VALID' && c.type !== 'ROOT' ? (
+                          <button
+                            className="btn btn-danger"
+                            style={{ fontSize: 12, padding: '6px 12px' }}
+                            onClick={() => openRevoke(c)}
+                          >
+                            Unieważnij
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       {selected && (
-        <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: 900 }}>
-            <div className="modal-header">
+        <div className="modal-overlay" onClick={closeDetailsModal}>
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 'min(920px, calc(100vw - 32px))',
+              maxHeight: '90vh',
+              overflow: 'hidden',
+              padding: 0,
+            }}
+          >
+            <div
+              className="modal-header"
+              style={{
+                padding: '20px 24px 16px',
+                borderBottom: '1px solid var(--border)',
+                position: 'sticky',
+                top: 0,
+                background: 'var(--surface)',
+                zIndex: 2,
+              }}
+            >
               <h3>Szczegóły certyfikatu</h3>
               <button className="close-btn" onClick={closeDetailsModal}>
                 ×
               </button>
             </div>
 
-            <div className="detail-grid">
-              <div className="detail-item"><label>ID</label><span>{selected.id}</span></div>
-              <div className="detail-item"><label>Serial Number</label><span className="mono">{selected.serial_number}</span></div>
-              <div className="detail-item"><label>Common Name</label><span>{selected.common_name || '—'}</span></div>
-              <div className="detail-item"><label>Organizacja</label><span>{selected.organization || '—'}</span></div>
-              <div className="detail-item"><label>Typ</label><span>{selected.type}</span></div>
-              <div className="detail-item"><label>Status</label><span>{selected.status}</span></div>
-              <div className="detail-item"><label>Ważny od</label><span>{selected.not_before ? new Date(selected.not_before).toLocaleString('pl-PL') : '—'}</span></div>
-              <div className="detail-item"><label>Ważny do</label><span>{selected.not_after ? new Date(selected.not_after).toLocaleString('pl-PL') : '—'}</span></div>
-              <div className="detail-item"><label>Unieważniony</label><span>{selected.revoked_at ? new Date(selected.revoked_at).toLocaleString('pl-PL') : 'Nie'}</span></div>
-              <div className="detail-item"><label>Powód unieważnienia</label><span>{selected.revocation_reason || '—'}</span></div>
-            </div>
+            <div
+              style={{
+                padding: 24,
+                maxHeight: 'calc(90vh - 76px)',
+                overflowY: 'auto',
+                scrollbarWidth: 'none',
+                msOverflowStyle: 'none',
+              }}
+              className="modal-content-no-scrollbar"
+            >
+              <div className="detail-grid" style={{ marginBottom: 16 }}>
+                <div className="detail-item"><label>Common Name</label><span>{selected.common_name || '—'}</span></div>
+                <div className="detail-item"><label>Organizacja</label><span>{selected.organization || '—'}</span></div>
+                <div className="detail-item"><label>Typ</label><span><span className={`badge badge-${String(selected.type).toLowerCase()}`}>{selected.type}</span></span></div>
+                <div className="detail-item"><label>Status</label><span><span className={`badge badge-${String(selected.status).toLowerCase()}`}>{selected.status}</span></span></div>
+                <div className="detail-item"><label>Ważny od</label><span>{selected.not_before ? new Date(selected.not_before).toLocaleString('pl-PL') : '—'}</span></div>
+                <div className="detail-item"><label>Ważny do</label><span>{selected.not_after ? new Date(selected.not_after).toLocaleString('pl-PL') : '—'}</span></div>
+                {selected.revoked_at ? (
+                  <div className="detail-item"><label>Unieważniony</label><span>{new Date(selected.revoked_at).toLocaleString('pl-PL')}</span></div>
+                ) : null}
+                {selected.revocation_reason ? (
+                  <div className="detail-item"><label>Powód unieważnienia</label><span>{selected.revocation_reason}</span></div>
+                ) : null}
+              </div>
 
-            <div className="form-group" style={{ marginTop: 20 }}>
-              <label>PEM</label>
-              <textarea readOnly value={selected.pem_data || ''} rows={14} style={{ width: '100%', fontFamily: 'monospace', fontSize: 12 }} />
-            </div>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Numer seryjny
+                </label>
+                <div className="mono" style={{ marginTop: 4 }}>{selected.serial_number}</div>
+              </div>
 
-            <div className="actions" style={{ marginTop: 20 }}>
-              <button className="btn btn-ghost" onClick={() => downloadPem(selected)}>
-                Pobierz PEM
-              </button>
+              <div>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Certyfikat PEM
+                </label>
+                <pre
+                  style={{
+                    marginTop: 8,
+                    padding: 16,
+                    borderRadius: 12,
+                    background: 'var(--surface-alt)',
+                    border: '1px solid var(--border)',
+                    overflowX: 'auto',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    fontSize: 12,
+                    lineHeight: 1.5,
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                  }}
+                >
+                  {selected.pem_data || 'Brak danych PEM'}
+                </pre>
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {revokeTarget && (
-        <div className="modal-overlay">
-          <div className="modal">
+        <div className="modal-overlay" onClick={closeRevokeModal}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Unieważnij certyfikat</h3>
-              <button className="close-btn" onClick={closeRevokeModal}>
-                ×
-              </button>
+              <button className="close-btn" onClick={closeRevokeModal}>×</button>
             </div>
 
-            <div className="detail-grid" style={{ marginBottom: 16 }}>
-              <div className="detail-item">
-                <label>Common Name</label>
-                <span>{revokeTarget.common_name || '—'}</span>
-              </div>
-              <div className="detail-item">
-                <label>Typ</label>
-                <span>{revokeTarget.type}</span>
-              </div>
-            </div>
+            <div className="alert alert-error">Ta operacja jest nieodwracalna.</div>
 
             <div className="form-group">
-              <label htmlFor="revocation_reason">Powód unieważnienia</label>
-              <textarea
-                id="revocation_reason"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                rows={4}
-                style={{ resize: 'vertical', width: '100%' }}
-              />
+              <label>Powód unieważnienia</label>
+              <select value={reason} onChange={(e) => setReason(e.target.value)}>
+                <option value="Utrata zaufania do certyfikatu">Utrata zaufania do certyfikatu</option>
+                <option value="keyCompromise">keyCompromise</option>
+                <option value="cACompromise">cACompromise</option>
+                <option value="affiliationChanged">affiliationChanged</option>
+                <option value="superseded">superseded</option>
+                <option value="cessationOfOperation">cessationOfOperation</option>
+              </select>
             </div>
 
-            <div className="actions" style={{ marginTop: 20 }}>
+            <div className="actions" style={{ justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost" onClick={closeRevokeModal}>Anuluj</button>
               <button className="btn btn-danger" onClick={handleRevoke} disabled={revokeLoading}>
-                {revokeLoading ? 'Unieważnianie...' : 'Potwierdź unieważnienie'}
-              </button>
-              <button className="btn btn-ghost" onClick={closeRevokeModal} disabled={revokeLoading}>
-                Anuluj
+                {revokeLoading ? <span className="spinner" /> : null}
+                Unieważnij
               </button>
             </div>
           </div>

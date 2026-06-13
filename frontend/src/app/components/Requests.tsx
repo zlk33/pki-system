@@ -64,8 +64,8 @@ export default function Requests() {
   }
 
   return (
-    <div className="card">
-      <div className="page-header" style={{ marginBottom: 16 }}>
+    <div>
+      <div className="page-header">
         <h2>Żądania CSR</h2>
         <p>Zarządzanie żądaniami podpisania certyfikatów.</p>
       </div>
@@ -73,101 +73,138 @@ export default function Requests() {
       {msg && <div className="alert alert-success">{msg}</div>}
       {error && <div className="alert alert-error">{error}</div>}
 
-      <div className="tabbar" style={{ marginBottom: 16 }}>
-        <button className={`tab ${tab === 'list' ? 'active' : ''}`} onClick={() => setTab('list')}>
+      <div
+        style={{
+          display: 'inline-flex',
+          gap: 8,
+          marginBottom: 20,
+          padding: 6,
+          borderRadius: 12,
+          background: 'var(--surface-alt)',
+          border: '1px solid var(--border)',
+        }}
+      >
+        <button
+          type="button"
+          className="btn"
+          onClick={() => setTab('list')}
+          style={{
+            background: tab === 'list' ? 'var(--primary)' : 'transparent',
+            color: tab === 'list' ? 'white' : 'var(--text)',
+            boxShadow: tab === 'list' ? 'var(--shadow-sm)' : 'none',
+          }}
+        >
           Lista żądań
         </button>
-        <button className={`tab ${tab === 'submit' ? 'active' : ''}`} onClick={() => setTab('submit')}>
+        <button
+          type="button"
+          className="btn"
+          onClick={() => setTab('submit')}
+          style={{
+            background: tab === 'submit' ? 'var(--primary)' : 'transparent',
+            color: tab === 'submit' ? 'white' : 'var(--text)',
+            boxShadow: tab === 'submit' ? 'var(--shadow-sm)' : 'none',
+          }}
+        >
           Prześlij CSR
         </button>
       </div>
 
       {tab === 'list' && (
-        <div className="table-wrap">
+        <div className="card" style={{ padding: 0 }}>
           {loading ? (
-            <p>Ładowanie...</p>
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Ładowanie...</div>
           ) : requests.length === 0 ? (
             <div className="empty-state">
               <p>Brak żądań CSR.</p>
             </div>
           ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Common Name</th>
-                  <th>Status</th>
-                  <th>Data przesłania</th>
-                  <th>Akcje</th>
-                </tr>
-              </thead>
-              <tbody>
-                {requests.map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.common_name}</td>
-                    <td>
-                      <span className={`badge badge-${String(r.status).toLowerCase()}`}>{r.status}</span>
-                    </td>
-                    <td>{r.created_at ? new Date(r.created_at).toLocaleString('pl-PL') : '—'}</td>
-                    <td>
-                      {r.status === 'PENDING' ? (
-                        <div className="actions-inline">
-                          <button
-                            className="btn btn-primary"
-                            onClick={() => handleAction(r.id, 'approve')}
-                            disabled={actionLoading === r.id}
-                          >
-                            {actionLoading === r.id ? 'Przetwarzanie...' : 'Zatwierdź'}
-                          </button>
-                          <button
-                            className="btn btn-danger"
-                            onClick={() => handleAction(r.id, 'reject')}
-                            disabled={actionLoading === r.id}
-                          >
-                            Odrzuć
-                          </button>
-                        </div>
-                      ) : (
-                        <span>—</span>
-                      )}
-                    </td>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Common Name</th>
+                    <th>Status</th>
+                    <th>Data przesłania</th>
+                    <th>Akcje</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {requests.map((r) => (
+                    <tr key={r.id}>
+                      <td style={{ fontWeight: 500 }}>{r.common_name}</td>
+                      <td>
+                        <span className={`badge badge-${String(r.status).toLowerCase()}`}>{r.status}</span>
+                      </td>
+                      <td style={{ color: 'var(--text-muted)' }}>
+                        {r.created_at ? new Date(r.created_at).toLocaleString('pl-PL') : '—'}
+                      </td>
+                      <td>
+                        {r.status === 'PENDING' ? (
+                          <div className="actions" style={{ gap: 8, flexWrap: 'wrap' }}>
+                            <button
+                              className="btn btn-primary"
+                              style={{ fontSize: 12, padding: '6px 12px' }}
+                              disabled={actionLoading === r.id}
+                              onClick={() => handleAction(r.id, 'approve')}
+                            >
+                              {actionLoading === r.id ? <span className="spinner" /> : null}
+                              Zatwierdź
+                            </button>
+                            <button
+                              className="btn btn-danger"
+                              style={{ fontSize: 12, padding: '6px 12px' }}
+                              disabled={actionLoading === r.id}
+                              onClick={() => handleAction(r.id, 'reject')}
+                            >
+                              Odrzuć
+                            </button>
+                          </div>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
 
       {tab === 'submit' && (
-        <form onSubmit={handleSubmitCSR} className="form-grid">
-          <div className="form-group">
-            <label htmlFor="common_name">Common Name</label>
-            <input
-              id="common_name"
-              value={csrForm.common_name}
-              onChange={(e) => setCsrForm((f) => ({ ...f, common_name: e.target.value }))}
-              required
-            />
-          </div>
+        <div className="card">
+          <div className="card-title">Prześlij żądanie podpisania certyfikatu (CSR)</div>
+          <form onSubmit={handleSubmitCSR}>
+            <div className="form-group">
+              <label>Common Name</label>
+              <input
+                placeholder="np. example.com"
+                value={csrForm.common_name}
+                onChange={(e) => setCsrForm((f) => ({ ...f, common_name: e.target.value }))}
+                required
+              />
+            </div>
 
-          <div className="form-group">
-            <label htmlFor="csr_pem_data">CSR (PEM)</label>
-            <textarea
-              id="csr_pem_data"
-              value={csrForm.csr_pem_data}
-              onChange={(e) => setCsrForm((f) => ({ ...f, csr_pem_data: e.target.value }))}
-              required
-              rows={12}
-              style={{ resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }}
-            />
-          </div>
+            <div className="form-group">
+              <label>CSR (PEM)</label>
+              <textarea
+                rows={10}
+                placeholder={`-----BEGIN CERTIFICATE REQUEST-----\n...\n-----END CERTIFICATE REQUEST-----`}
+                value={csrForm.csr_pem_data}
+                onChange={(e) => setCsrForm((f) => ({ ...f, csr_pem_data: e.target.value }))}
+                required
+                style={{ resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }}
+              />
+            </div>
 
-          <div className="actions">
-            <button className="btn btn-primary" type="submit" disabled={submitLoading}>
-              {submitLoading ? 'Wysyłanie...' : 'Prześlij CSR'}
+            <button type="submit" className="btn btn-primary" disabled={submitLoading}>
+              {submitLoading ? <span className="spinner" /> : null}
+              Prześlij CSR
             </button>
-          </div>
-        </form>
+          </form>
+        </div>
       )}
     </div>
   )
