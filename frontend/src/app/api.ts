@@ -36,7 +36,11 @@ async function req<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(err.detail || 'Błąd serwera')
   }
 
-  return res.json()
+  const contentType = res.headers.get('content-type') || ''
+  if (contentType.includes('application/json')) {
+    return res.json()
+  }
+  return res.text() as Promise<T>
 }
 
 export const api = {
@@ -47,6 +51,12 @@ export const api = {
 
   getCertificates: () =>
     req<Certificate[]>('/api/certificates'),
+
+  getCertificateDetails: (id: number) =>
+    req<Certificate>(`/api/certificates/${id}`),
+
+  getCertificatePem: (id: number) =>
+    req<string>(`/api/certificates/${id}/pem`),
 
   getRequests: () =>
     req<CertRequest[]>('/api/requests'),
@@ -62,6 +72,11 @@ export const api = {
 
   approveRequest: (id: number) =>
     req<{ message: string; serial_number: string }>(`/api/certs/approve/${id}`, {
+      method: 'POST',
+    }),
+
+  rejectRequest: (id: number) =>
+    req<{ message: string; status: string }>(`/api/requests/${id}/reject`, {
       method: 'POST',
     }),
 

@@ -3,18 +3,19 @@ from datetime import datetime
 from typing import Optional
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from . import db, ca_manager, cert_manager
 
-app = FastAPI(title="Proste PKI - API")
+app = FastAPI(title='Proste PKI - API')
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=['http://localhost:3000'],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=['*'],
+    allow_headers=['*'],
 )
 
 class CSRRequestModel(BaseModel):
@@ -42,6 +43,7 @@ class CertificateOut(BaseModel):
     status: str
     not_before: Optional[str] = None
     not_after: Optional[str] = None
+    pem_data: Optional[str] = None
     revoked_at: Optional[str] = None
     revocation_reason: Optional[str] = None
 
@@ -51,6 +53,21 @@ def get_db():
         yield database
     finally:
         database.close()
+
+def serialize_certificate(cert: db.Certificate):
+    return {
+        'id': cert.id,
+        'serial_number': cert.serial_number,
+        'common_name': cert.common_name,
+        'organization': cert.organization,
+        'type': cert.type,
+        'status': cert.status,
+        'not_before': cert.not_before.isoformat() if cert.not_before else None,
+        'not_after': cert.not_after.isoformat() if cert.not_after else None,
+        'pem_data': cert.pem_data,
+        'revoked_at': cert.revoked_at.isoformat() if cert.revoked_at else None,
+        'revocation_reason': cert.revocation_reason,
+    }
 
 os.makedirs('/app/certs', exist_ok=True)
 
@@ -113,24 +130,40 @@ def get_requests(database: Session = Depends(get_db)):
         for r in requests
     ]
 
+@app.post('/api/requests/{request_id}/reject')
+def reject_request(request_id: int, database: Session = Depends(get_db)):
+    cert_request = database.query(db.Request).filter(db.Request.id == request_id).first()
+    if not cert_request:
+        raise HTTPException(status_code=404, detail='Nie znaleziono takiego wniosku')
+    if cert_request.status != 'PENDING':
+        raise HTTPException(status_code=400, detail='Tylko oczekujące wnioski można odrzucić')
+
+    cert_request.status = 'REJECTED'
+    database.commit()
+
+    return {
+        'message': f'Wniosek ID {request_id} został odrzucony.',
+        'status': cert_request.status,
+    }
+
 @app.get('/api/certificates')
 def get_certificates(database: Session = Depends(get_db)):
     certs = database.query(db.Certificate).order_by(db.Certificate.id.desc()).all()
-    return [
-        {
-            'id': c.id,
-            'serial_number': c.serial_number,
-            'common_name': c.common_name,
-            'organization': c.organization,
-            'type': c.type,
-            'status': c.status,
-            'not_before': c.not_before.isoformat() if c.not_before else None,
-            'not_after': c.not_after.isoformat() if c.not_after else None,
-            'revoked_at': c.revoked_at.isoformat() if c.revoked_at else None,
-            'revocation_reason': c.revocation_reason,
-        }
-        for c in certs
-    ]
+    return [serialize_certificate(c) for c in certs]
+
+@app.get('/api/certificates/{certificate_id}')
+def get_certificate_details(certificate_id: int, database: Session = Depends(get_db)):
+    cert = database.query(db.Certificate).filter(db.Certificate.id == certificate_id).first()
+    if not cert:
+        raise HTTPException(status_code=404, detail='Nie znaleziono certyfikatu')
+    return serialize_certificate(cert)
+
+@app.get('/api/certificates/{certificate_id}/pem', response_class=PlainTextResponse)
+def get_certificate_pem(certificate_id: int, database: Session = Depends(get_db)):
+    cert = database.query(db.Certificate).filter(db.Certificate.id == certificate_id).first()
+    if not cert:
+        raise HTTPException(status_code=404, detail='Nie znaleziono certyfikatu')
+    return cert.pem_data or ''
 
 @app.post('/api/certificates/issue')
 def issue_certificate(payload: IssueCertificateModel, database: Session = Depends(get_db)):

@@ -9,8 +9,10 @@ export default function Certificates() {
   const [error, setError] = useState('')
   const [msg, setMsg] = useState('')
   const [selected, setSelected] = useState<Certificate | null>(null)
+  const [revokeTarget, setRevokeTarget] = useState<Certificate | null>(null)
   const [reason, setReason] = useState('')
   const [revokeLoading, setRevokeLoading] = useState(false)
+  const [detailsLoading, setDetailsLoading] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -29,21 +31,56 @@ export default function Certificates() {
     load()
   }, [])
 
+  const openDetails = async (cert: Certificate) => {
+    setDetailsLoading(true)
+    setError('')
+    try {
+      const details = await api.getCertificateDetails(cert.id)
+      setSelected(details)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Błąd pobierania szczegółów certyfikatu')
+    } finally {
+      setDetailsLoading(false)
+    }
+  }
+
+  const downloadPem = async (cert: Certificate) => {
+    setError('')
+    try {
+      const pem = await api.getCertificatePem(cert.id)
+      const blob = new Blob([pem], { type: 'application/x-pem-file' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${(cert.common_name || `cert-${cert.id}`).replace(/\s+/g, '_')}.pem`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Błąd pobierania PEM')
+    }
+  }
+
   const openRevoke = (cert: Certificate) => {
-    setSelected(cert)
+    setRevokeTarget(cert)
     setReason('Utrata zaufania do certyfikatu')
     setMsg('')
     setError('')
   }
 
-  const closeModal = () => {
-    setSelected(null)
+  const closeRevokeModal = () => {
+    setRevokeTarget(null)
     setReason('')
     setRevokeLoading(false)
   }
 
+  const closeDetailsModal = () => {
+    setSelected(null)
+  }
+
   const handleRevoke = async () => {
-    if (!selected) return
+    if (!revokeTarget) return
     if (!reason.trim()) {
       setError('Podaj powód unieważnienia')
       return
@@ -53,9 +90,9 @@ export default function Certificates() {
     setError('')
     setMsg('')
     try {
-      const res = await api.revokeCertificate(selected.id, reason)
+      const res = await api.revokeCertificate(revokeTarget.id, reason)
       setMsg(res.message)
-      closeModal()
+      closeRevokeModal()
       await load()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Błąd unieważniania certyfikatu')
@@ -115,13 +152,19 @@ export default function Certificates() {
                   <td>{c.not_before ? new Date(c.not_before).toLocaleDateString('pl-PL') : '—'}</td>
                   <td>{c.not_after ? new Date(c.not_after).toLocaleDateString('pl-PL') : '—'}</td>
                   <td>
-                    {c.status === 'VALID' && c.type !== 'ROOT' ? (
-                      <button className="btn btn-danger" onClick={() => openRevoke(c)}>
-                        Unieważnij
+                    <div className="actions-inline">
+                      <button className="btn btn-secondary" onClick={() => openDetails(c)} disabled={detailsLoading}>
+                        Szczegóły
                       </button>
-                    ) : (
-                      <span>—</span>
-                    )}
+                      <button className="btn btn-ghost" onClick={() => downloadPem(c)}>
+                        Pobierz PEM
+                      </button>
+                      {c.status === 'VALID' && c.type !== 'ROOT' ? (
+                        <button className="btn btn-danger" onClick={() => openRevoke(c)}>
+                          Unieważnij
+                        </button>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -132,10 +175,47 @@ export default function Certificates() {
 
       {selected && (
         <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: 900 }}>
+            <div className="modal-header">
+              <h3>Szczegóły certyfikatu</h3>
+              <button className="close-btn" onClick={closeDetailsModal}>
+                ×
+              </button>
+            </div>
+
+            <div className="detail-grid">
+              <div className="detail-item"><label>ID</label><span>{selected.id}</span></div>
+              <div className="detail-item"><label>Serial Number</label><span className="mono">{selected.serial_number}</span></div>
+              <div className="detail-item"><label>Common Name</label><span>{selected.common_name || '—'}</span></div>
+              <div className="detail-item"><label>Organizacja</label><span>{selected.organization || '—'}</span></div>
+              <div className="detail-item"><label>Typ</label><span>{selected.type}</span></div>
+              <div className="detail-item"><label>Status</label><span>{selected.status}</span></div>
+              <div className="detail-item"><label>Ważny od</label><span>{selected.not_before ? new Date(selected.not_before).toLocaleString('pl-PL') : '—'}</span></div>
+              <div className="detail-item"><label>Ważny do</label><span>{selected.not_after ? new Date(selected.not_after).toLocaleString('pl-PL') : '—'}</span></div>
+              <div className="detail-item"><label>Unieważniony</label><span>{selected.revoked_at ? new Date(selected.revoked_at).toLocaleString('pl-PL') : 'Nie'}</span></div>
+              <div className="detail-item"><label>Powód unieważnienia</label><span>{selected.revocation_reason || '—'}</span></div>
+            </div>
+
+            <div className="form-group" style={{ marginTop: 20 }}>
+              <label>PEM</label>
+              <textarea readOnly value={selected.pem_data || ''} rows={14} style={{ width: '100%', fontFamily: 'monospace', fontSize: 12 }} />
+            </div>
+
+            <div className="actions" style={{ marginTop: 20 }}>
+              <button className="btn btn-ghost" onClick={() => downloadPem(selected)}>
+                Pobierz PEM
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {revokeTarget && (
+        <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
               <h3>Unieważnij certyfikat</h3>
-              <button className="close-btn" onClick={closeModal}>
+              <button className="close-btn" onClick={closeRevokeModal}>
                 ×
               </button>
             </div>
@@ -143,11 +223,11 @@ export default function Certificates() {
             <div className="detail-grid" style={{ marginBottom: 16 }}>
               <div className="detail-item">
                 <label>Common Name</label>
-                <span>{selected.common_name || '—'}</span>
+                <span>{revokeTarget.common_name || '—'}</span>
               </div>
               <div className="detail-item">
                 <label>Typ</label>
-                <span>{selected.type}</span>
+                <span>{revokeTarget.type}</span>
               </div>
             </div>
 
@@ -166,7 +246,7 @@ export default function Certificates() {
               <button className="btn btn-danger" onClick={handleRevoke} disabled={revokeLoading}>
                 {revokeLoading ? 'Unieważnianie...' : 'Potwierdź unieważnienie'}
               </button>
-              <button className="btn btn-ghost" onClick={closeModal} disabled={revokeLoading}>
+              <button className="btn btn-ghost" onClick={closeRevokeModal} disabled={revokeLoading}>
                 Anuluj
               </button>
             </div>

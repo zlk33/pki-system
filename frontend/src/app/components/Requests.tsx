@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { api, CertRequest } from '../api'
 
 export default function Requests() {
@@ -30,7 +30,7 @@ export default function Requests() {
     load()
   }, [])
 
-  const handleSubmitCSR = async (e: React.FormEvent) => {
+  const handleSubmitCSR = async (e: FormEvent) => {
     e.preventDefault()
     setSubmitLoading(true)
     setMsg('')
@@ -48,12 +48,12 @@ export default function Requests() {
     }
   }
 
-  const handleApprove = async (id: number) => {
+  const handleAction = async (id: number, action: 'approve' | 'reject') => {
     setActionLoading(id)
     setMsg('')
     setError('')
     try {
-      const res = await api.approveRequest(id)
+      const res = action === 'approve' ? await api.approveRequest(id) : await api.rejectRequest(id)
       setMsg(res.message)
       await load()
     } catch (e: unknown) {
@@ -70,20 +70,20 @@ export default function Requests() {
         <p>Zarządzanie żądaniami podpisania certyfikatów.</p>
       </div>
 
-      <div className="actions" style={{ marginBottom: 16 }}>
-        <button className={`btn ${tab === 'list' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setTab('list')}>
+      {msg && <div className="alert alert-success">{msg}</div>}
+      {error && <div className="alert alert-error">{error}</div>}
+
+      <div className="tabbar" style={{ marginBottom: 16 }}>
+        <button className={`tab ${tab === 'list' ? 'active' : ''}`} onClick={() => setTab('list')}>
           Lista żądań
         </button>
-        <button className={`btn ${tab === 'submit' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setTab('submit')}>
+        <button className={`tab ${tab === 'submit' ? 'active' : ''}`} onClick={() => setTab('submit')}>
           Prześlij CSR
         </button>
       </div>
 
-      {msg && <div className="alert alert-success">{msg}</div>}
-      {error && <div className="alert alert-error">{error}</div>}
-
       {tab === 'list' && (
-        <>
+        <div className="table-wrap">
           {loading ? (
             <p>Ładowanie...</p>
           ) : requests.length === 0 ? (
@@ -91,48 +91,55 @@ export default function Requests() {
               <p>Brak żądań CSR.</p>
             </div>
           ) : (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Common Name</th>
-                    <th>Status</th>
-                    <th>Data przesłania</th>
-                    <th>Akcje</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {requests.map((r) => (
-                    <tr key={r.id}>
-                      <td>{r.common_name}</td>
-                      <td>
-                        <span className={`badge badge-${r.status.toLowerCase()}`}>{r.status}</span>
-                      </td>
-                      <td>{new Date(r.created_at).toLocaleString('pl-PL')}</td>
-                      <td>
-                        {r.status === 'PENDING' ? (
+            <table>
+              <thead>
+                <tr>
+                  <th>Common Name</th>
+                  <th>Status</th>
+                  <th>Data przesłania</th>
+                  <th>Akcje</th>
+                </tr>
+              </thead>
+              <tbody>
+                {requests.map((r) => (
+                  <tr key={r.id}>
+                    <td>{r.common_name}</td>
+                    <td>
+                      <span className={`badge badge-${String(r.status).toLowerCase()}`}>{r.status}</span>
+                    </td>
+                    <td>{r.created_at ? new Date(r.created_at).toLocaleString('pl-PL') : '—'}</td>
+                    <td>
+                      {r.status === 'PENDING' ? (
+                        <div className="actions-inline">
                           <button
                             className="btn btn-primary"
-                            onClick={() => handleApprove(r.id)}
+                            onClick={() => handleAction(r.id, 'approve')}
                             disabled={actionLoading === r.id}
                           >
-                            {actionLoading === r.id ? 'Zatwierdzanie...' : 'Zatwierdź'}
+                            {actionLoading === r.id ? 'Przetwarzanie...' : 'Zatwierdź'}
                           </button>
-                        ) : (
-                          <span>—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                          <button
+                            className="btn btn-danger"
+                            onClick={() => handleAction(r.id, 'reject')}
+                            disabled={actionLoading === r.id}
+                          >
+                            Odrzuć
+                          </button>
+                        </div>
+                      ) : (
+                        <span>—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
-        </>
+        </div>
       )}
 
       {tab === 'submit' && (
-        <form onSubmit={handleSubmitCSR}>
+        <form onSubmit={handleSubmitCSR} className="form-grid">
           <div className="form-group">
             <label htmlFor="common_name">Common Name</label>
             <input
@@ -151,13 +158,15 @@ export default function Requests() {
               onChange={(e) => setCsrForm((f) => ({ ...f, csr_pem_data: e.target.value }))}
               required
               rows={12}
-              style={{ resize: 'vertical', fontFamily: 'monospace', fontSize: 12, width: '100%' }}
+              style={{ resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }}
             />
           </div>
 
-          <button className="btn btn-primary" type="submit" disabled={submitLoading}>
-            {submitLoading ? 'Wysyłanie...' : 'Prześlij CSR'}
-          </button>
+          <div className="actions">
+            <button className="btn btn-primary" type="submit" disabled={submitLoading}>
+              {submitLoading ? 'Wysyłanie...' : 'Prześlij CSR'}
+            </button>
+          </div>
         </form>
       )}
     </div>
