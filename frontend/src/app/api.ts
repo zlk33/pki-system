@@ -22,6 +22,14 @@ export interface CertRequest {
   csr_pem_data?: string
 }
 
+export interface GeneratedCertificateResponse {
+  message: string
+  certificate_id: number
+  serial_number: string
+  certificate_pem: string
+  private_key_pem: string
+}
+
 async function req<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     headers: {
@@ -84,6 +92,12 @@ export const api = {
     req<{ message: string; serial_number: string }>('/api/certificates/issue', {
       method: 'POST',
       body: JSON.stringify({ request_id: requestId }),
+    }),
+
+  generateCertificate: (data: { common_name: string; organization: string; cert_type: 'SERVER' | 'CLIENT' }) =>
+    req<GeneratedCertificateResponse>('/api/certificates/generate', {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
 
   revokeCertificate: (id: number, reason: string) =>

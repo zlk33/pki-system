@@ -28,6 +28,11 @@ class IssueCertificateModel(BaseModel):
 class RevokeCertificateModel(BaseModel):
     reason: str
 
+class GenerateCertificateModel(BaseModel):
+    common_name: str
+    organization: str = 'Studenckie PKI'
+    cert_type: str = 'SERVER'
+
 class RequestOut(BaseModel):
     id: int
     common_name: str
@@ -164,6 +169,61 @@ def get_certificate_pem(certificate_id: int, database: Session = Depends(get_db)
     if not cert:
         raise HTTPException(status_code=404, detail='Nie znaleziono certyfikatu')
     return cert.pem_data or ''
+
+@app.post('/api/certificates/generate')
+def generate_certificate_from_form(payload: GenerateCertificateModel, database: Session = Depends(get_db)):
+    root_ca = database.query(db.Certificate).filter(db.Certificate.type == 'ROOT').first()
+    if not root_ca:
+        raise HTTPException(status_code=500, detail='Brak Root CA w bazie. Najpierw zainicjuj urząd.')
+
+    try:
+        with open('/app/certs/root_ca.key', 'rb') as f:
+            root_key_pem = f.read()
+    except FileNotFoundError:
+        raise HTTPException(status_code=500, detail='Nie znaleziono klucza prywatnego Root CA na dysku')
+
+    cert_type = payload.cert_type.upper().strip()
+    if cert_type not in {'SERVER', 'CLIENT'}:
+        raise HTTPException(status_code=400, detail='Dozwolone typy certyfikatu: SERVER albo CLIENT')
+
+    common_name = payload.common_name.strip()
+    if not common_name:
+        raise HTTPException(status_code=400, detail='Common Name jest wymagany')
+
+    organization = payload.organization.strip() or 'Studenckie PKI'
+
+    try:
+        cert_obj, cert_pem, key_pem = cert_manager.generate_key_and_certificate(
+            common_name=common_name,
+            organization=organization,
+            cert_type=cert_type,
+            ca_cert_pem=root_ca.pem_data.encode('utf-8'),
+            ca_key_pem=root_key_pem,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f'Nie udało się wygenerować certyfikatu: {str(e)}')
+
+    db_cert = db.Certificate(
+        serial_number=str(cert_obj.serial_number),
+        common_name=common_name,
+        organization=organization,
+        type=cert_type,
+        status='VALID',
+        not_before=cert_obj.not_valid_before_utc.replace(tzinfo=None),
+        not_after=cert_obj.not_valid_after_utc.replace(tzinfo=None),
+        pem_data=cert_pem,
+    )
+    database.add(db_cert)
+    database.commit()
+    database.refresh(db_cert)
+
+    return {
+        'message': f'Certyfikat {common_name} został wygenerowany pomyślnie.',
+        'certificate_id': db_cert.id,
+        'serial_number': db_cert.serial_number,
+        'certificate_pem': cert_pem,
+        'private_key_pem': key_pem,
+    }
 
 @app.post('/api/certificates/issue')
 def issue_certificate(payload: IssueCertificateModel, database: Session = Depends(get_db)):
