@@ -70,4 +70,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ request_id: requestId }),
     }),
+
+  revokeCertificate: (id: number, reason: string) =>
+    req<{ message: string; revoked_at: string; revocation_reason: string }>(`/api/certificates/${id}/revoke`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
 }

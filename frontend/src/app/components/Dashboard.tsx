@@ -29,10 +29,30 @@ export default function Dashboard({ onNavigate }: Props) {
   const pending = requests.filter((r) => r.status === 'PENDING').length
 
   const stats = [
-    { label: 'Wszystkie certyfikaty', value: certs.length, action: () => onNavigate('certificates') },
-    { label: 'Ważne', value: valid, action: () => onNavigate('certificates') },
-    { label: 'Unieważnione', value: revoked, action: () => onNavigate('certificates') },
-    { label: 'Oczekujące żądania', value: pending, action: () => onNavigate('requests') },
+    {
+      label: 'Wszystkie certyfikaty',
+      value: certs.length,
+      color: 'var(--accent)',
+      action: () => onNavigate('certificates'),
+    },
+    {
+      label: 'Ważne',
+      value: valid,
+      color: 'var(--success)',
+      action: () => onNavigate('certificates'),
+    },
+    {
+      label: 'Unieważnione',
+      value: revoked,
+      color: 'var(--error)',
+      action: () => onNavigate('certificates'),
+    },
+    {
+      label: 'Oczekujące żądania',
+      value: pending,
+      color: 'var(--warning)',
+      action: () => onNavigate('requests'),
+    },
   ]
 
   return (
@@ -57,9 +77,53 @@ export default function Dashboard({ onNavigate }: Props) {
             }}
           >
             {stats.map((s) => (
-              <button key={s.label} className="card" onClick={s.action} style={{ textAlign: 'left', marginBottom: 0 }}>
-                <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 6 }}>{s.value}</div>
-                <div style={{ color: 'var(--text-muted)' }}>{s.label}</div>
+              <button
+                key={s.label}
+                className="card"
+                onClick={s.action}
+                style={{
+                  textAlign: 'left',
+                  marginBottom: 0,
+                  cursor: 'pointer',
+                  border: `1px solid ${s.color}`,
+                  background: `linear-gradient(180deg, ${s.color}15 0%, var(--surface) 55%)`,
+                  boxShadow: `inset 0 1px 0 ${s.color}22`,
+                  transition: 'transform 0.15s ease, border-color 0.15s ease, background 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.borderColor = s.color
+                  e.currentTarget.style.background = `linear-gradient(180deg, ${s.color}22 0%, var(--surface) 60%)`
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.borderColor = s.color
+                  e.currentTarget.style.background = `linear-gradient(180deg, ${s.color}15 0%, var(--surface) 55%)`
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 28,
+                    fontWeight: 700,
+                    marginBottom: 6,
+                    color: s.color,
+                  }}
+                >
+                  {s.value}
+                </div>
+
+                <div style={{ color: 'var(--text)' }}>{s.label}</div>
+
+                <div
+                  style={{
+                    width: 36,
+                    height: 4,
+                    borderRadius: 999,
+                    marginTop: 14,
+                    background: s.color,
+                    opacity: 0.9,
+                  }}
+                />
               </button>
             ))}
           </div>

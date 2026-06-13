@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from typing import Optional
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, Depends, HTTPException
@@ -23,8 +24,8 @@ class CSRRequestModel(BaseModel):
 class IssueCertificateModel(BaseModel):
     request_id: int
 
-class RequestStatusModel(BaseModel):
-    status: str
+class RevokeCertificateModel(BaseModel):
+    reason: str
 
 class RequestOut(BaseModel):
     id: int
@@ -41,6 +42,8 @@ class CertificateOut(BaseModel):
     status: str
     not_before: Optional[str] = None
     not_after: Optional[str] = None
+    revoked_at: Optional[str] = None
+    revocation_reason: Optional[str] = None
 
 def get_db():
     database = db.SessionLocal()
@@ -123,6 +126,8 @@ def get_certificates(database: Session = Depends(get_db)):
             'status': c.status,
             'not_before': c.not_before.isoformat() if c.not_before else None,
             'not_after': c.not_after.isoformat() if c.not_after else None,
+            'revoked_at': c.revoked_at.isoformat() if c.revoked_at else None,
+            'revocation_reason': c.revocation_reason,
         }
         for c in certs
     ]
@@ -179,3 +184,29 @@ def issue_certificate(payload: IssueCertificateModel, database: Session = Depend
 @app.post('/api/certs/approve/{request_id}')
 def approve_certificate_request(request_id: int, database: Session = Depends(get_db)):
     return issue_certificate(IssueCertificateModel(request_id=request_id), database)
+
+@app.post('/api/certificates/{certificate_id}/revoke')
+def revoke_certificate(certificate_id: int, payload: RevokeCertificateModel, database: Session = Depends(get_db)):
+    cert = database.query(db.Certificate).filter(db.Certificate.id == certificate_id).first()
+    if not cert:
+        raise HTTPException(status_code=404, detail='Nie znaleziono certyfikatu')
+    if cert.type == 'ROOT':
+        raise HTTPException(status_code=400, detail='Nie można unieważnić Root CA z poziomu panelu')
+    if cert.status == 'REVOKED':
+        raise HTTPException(status_code=400, detail='Certyfikat został już unieważniony')
+
+    reason = payload.reason.strip()
+    if not reason:
+        raise HTTPException(status_code=400, detail='Powód unieważnienia jest wymagany')
+
+    cert.status = 'REVOKED'
+    cert.revoked_at = datetime.utcnow()
+    cert.revocation_reason = reason
+    database.commit()
+    database.refresh(cert)
+
+    return {
+        'message': f'Certyfikat {cert.common_name or cert.serial_number} został unieważniony.',
+        'revoked_at': cert.revoked_at.isoformat() if cert.revoked_at else None,
+        'revocation_reason': cert.revocation_reason,
+    }
