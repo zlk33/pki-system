@@ -1,44 +1,56 @@
 'use client'
 
-import { useState } from 'react'
-import { api } from '../api'
+import { useEffect, useState } from 'react'
+import { api, CertRequest } from '../api'
 
 interface Props {
   onDone: () => void
 }
 
 export default function IssueCert({ onDone }: Props) {
-  const [form, setForm] = useState({
-    common_name: '',
-    organization: '',
-    country: '',
-    state: '',
-    locality: '',
-    type: 'SERVER' as 'SERVER' | 'CLIENT' | 'INTERMEDIATE',
-    validity_days: 365,
-  })
+  const [requests, setRequests] = useState<CertRequest[]>([])
+  const [selectedId, setSelectedId] = useState<number | ''>('')
   const [loading, setLoading] = useState(false)
+  const [listLoading, setListLoading] = useState(true)
   const [error, setError] = useState('')
-  const [result, setResult] = useState<{ message: string; pem: string } | null>(null)
+  const [result, setResult] = useState<{ message: string; serial_number: string } | null>(null)
 
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    setForm(f => ({ ...f, [k]: e.target.value }))
+  const loadRequests = async () => {
+    setListLoading(true)
+    setError('')
+    try {
+      const data = await api.getRequests()
+      const pending = data.filter((r) => r.status === 'PENDING')
+      setRequests(pending)
+      setSelectedId(pending.length > 0 ? pending[0].id : '')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Błąd ładowania wniosków')
+    } finally {
+      setListLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadRequests()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.common_name || !form.organization) {
-      setError('Common Name i Organizacja są wymagane')
+
+    if (!selectedId) {
+      setError('Wybierz wniosek CSR do wystawienia certyfikatu')
       return
     }
+
     setLoading(true)
     setError('')
     setResult(null)
+
     try {
-      const res = await api.issueCertificate({
-        ...form,
-        validity_days: Number(form.validity_days),
-      })
-      setResult({ message: res.message, pem: res.certificate.pem_data })
+      const res = await api.issueCertificate(Number(selectedId))
+      setResult(res)
+      await loadRequests()
+      onDone()
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Błąd wystawiania certyfikatu')
     } finally {
@@ -48,87 +60,77 @@ export default function IssueCert({ onDone }: Props) {
 
   if (result) {
     return (
-      <div>
-        <div className="page-header">
+      <div className="card">
+        <div className="page-header" style={{ marginBottom: 16 }}>
           <h2>Wystaw certyfikat</h2>
+          <p>Żądanie zostało zatwierdzone i podpisane przez Root CA.</p>
         </div>
-        <div className="card">
-          <div className="alert alert-success">{result.message}</div>
-          <div>
-            <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Certyfikat PEM
-            </label>
-            <div className="pem-box">{result.pem}</div>
+
+        <div className="alert alert-success">{result.message}</div>
+
+        <div className="detail-grid">
+          <div className="detail-item">
+            <label>Numer seryjny</label>
+            <span className="mono">{result.serial_number}</span>
           </div>
-          <div className="actions" style={{ marginTop: 16 }}>
-            <button className="btn btn-primary" onClick={onDone}>Przejdź do certyfikatów</button>
-            <button className="btn btn-ghost" onClick={() => setResult(null)}>Wystaw kolejny</button>
-          </div>
+        </div>
+
+        <div className="actions" style={{ marginTop: 20 }}>
+          <button className="btn btn-primary" onClick={onDone}>
+            Przejdź do certyfikatów
+          </button>
+          <button
+            className="btn btn-ghost"
+            onClick={() => {
+              setResult(null)
+              loadRequests()
+            }}
+          >
+            Wystaw kolejny
+          </button>
         </div>
       </div>
     )
   }
 
   return (
-    <div>
-      <div className="page-header">
+    <div className="card">
+      <div className="page-header" style={{ marginBottom: 16 }}>
         <h2>Wystaw certyfikat</h2>
-        <p>Generuj nowy certyfikat podpisany przez Root CA</p>
+        <p>Wybierz oczekujące żądanie CSR i podpisz je przez Root CA.</p>
       </div>
 
-      <div className="card">
-        {error && <div className="alert alert-error">{error}</div>}
+      {error && <div className="alert alert-error">{error}</div>}
+
+      {listLoading ? (
+        <p>Ładowanie żądań CSR...</p>
+      ) : requests.length === 0 ? (
+        <div className="alert alert-info">
+          Brak oczekujących żądań CSR. Najpierw dodaj żądanie w zakładce Requests.
+        </div>
+      ) : (
         <form onSubmit={handleSubmit}>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Common Name *</label>
-              <input placeholder="np. example.com" value={form.common_name} onChange={set('common_name')} required />
-            </div>
-            <div className="form-group">
-              <label>Organizacja *</label>
-              <input placeholder="np. Moja Firma" value={form.organization} onChange={set('organization')} required />
-            </div>
+          <div className="form-group">
+            <label htmlFor="request_id">Wniosek CSR</label>
+            <select
+              id="request_id"
+              value={selectedId}
+              onChange={(e) => setSelectedId(Number(e.target.value))}
+              disabled={loading}
+            >
+              {requests.map((r) => (
+                <option key={r.id} value={r.id}>
+                  #{r.id} — {r.common_name} — {new Date(r.created_at).toLocaleString('pl-PL')}
+                </option>
+              ))}
+            </select>
           </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label>Kraj</label>
-              <input placeholder="PL" maxLength={2} value={form.country} onChange={set('country')} />
-            </div>
-            <div className="form-group">
-              <label>Województwo / Stan</label>
-              <input placeholder="Mazowieckie" value={form.state} onChange={set('state')} />
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label>Miejscowość</label>
-              <input placeholder="Warszawa" value={form.locality} onChange={set('locality')} />
-            </div>
-            <div className="form-group">
-              <label>Typ certyfikatu</label>
-              <select value={form.type} onChange={set('type')}>
-                <option value="SERVER">SERVER - certyfikat serwera</option>
-                <option value="CLIENT">CLIENT - certyfikat klienta</option>
-                <option value="INTERMEDIATE">INTERMEDIATE - CA pośredni</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="form-group" style={{ maxWidth: 200 }}>
-            <label>Ważność (dni)</label>
-            <input type="number" min={1} max={3650} value={form.validity_days} onChange={set('validity_days')} />
-          </div>
-
-          <div className="actions">
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? <span className="spinner" /> : null}
-              {loading ? 'Generowanie...' : 'Wystaw certyfikat'}
-            </button>
-          </div>
+          <button type="submit" className="btn btn-primary" disabled={loading}>
+            {loading ? 'Wystawianie...' : 'Wystaw certyfikat'}
+          </button>
         </form>
-      </div>
+      )}
     </div>
   )
 }

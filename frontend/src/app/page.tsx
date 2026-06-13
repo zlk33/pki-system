@@ -9,13 +9,13 @@ import CAInit from './components/CAInit'
 
 type Page = 'dashboard' | 'certificates' | 'issue' | 'requests' | 'ca'
 
-const NAV = [
+const NAV: { id: Page; label: string; icon: string }[] = [
   { id: 'dashboard', label: 'Pulpit', icon: '▦' },
   { id: 'ca', label: 'Root CA', icon: '⬡' },
   { id: 'certificates', label: 'Certyfikaty', icon: '◈' },
   { id: 'issue', label: 'Wystaw certyfikat', icon: '+' },
   { id: 'requests', label: 'Żądania CSR', icon: '◎' },
-] as const
+]
 
 export default function Home() {
   const [page, setPage] = useState<Page>('dashboard')
@@ -24,20 +24,24 @@ export default function Home() {
     <div className="layout">
       <aside className="sidebar">
         <div className="sidebar-logo">
-          <h1>PKI System</h1>
-          <p>Zarządzanie certyfikatami</p>
+          <h1>Studenckie PKI</h1>
+          <p>Panel zarządzania</p>
         </div>
-        {NAV.map(n => (
-          <button
-            key={n.id}
-            className={`nav-item${page === n.id ? ' active' : ''}`}
-            onClick={() => setPage(n.id as Page)}
-          >
-            <span style={{ fontSize: 16 }}>{n.icon}</span>
-            {n.label}
-          </button>
-        ))}
+
+        <nav>
+          {NAV.map((item) => (
+            <button
+              key={item.id}
+              className={`nav-item ${page === item.id ? 'active' : ''}`}
+              onClick={() => setPage(item.id)}
+            >
+              <span>{item.icon}</span>
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </nav>
       </aside>
+
       <main className="main">
         {page === 'dashboard' && <Dashboard onNavigate={setPage} />}
         {page === 'ca' && <CAInit />}

@@ -7,188 +7,71 @@ export default function Certificates() {
   const [certs, setCerts] = useState<Certificate[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [selected, setSelected] = useState<Certificate | null>(null)
-  const [revokeId, setRevokeId] = useState<number | null>(null)
-  const [revokeReason, setRevokeReason] = useState('')
-  const [revokeLoading, setRevokeLoading] = useState(false)
-  const [msg, setMsg] = useState('')
 
   const load = async () => {
     setLoading(true)
+    setError('')
     try {
       const data = await api.getCertificates()
       setCerts(data)
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Błąd ładowania')
+      setError(e instanceof Error ? e.message : 'Błąd ładowania certyfikatów')
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { load() }, [])
-
-  const handleRevoke = async () => {
-    if (!revokeId) return
-    setRevokeLoading(true)
-    try {
-      const res = await api.revokeCertificate(revokeId, revokeReason || 'unspecified')
-      setMsg(res.message)
-      setRevokeId(null)
-      setRevokeReason('')
-      load()
-    } catch (e: unknown) {
-      setMsg(e instanceof Error ? e.message : 'Błąd unieważniania')
-    } finally {
-      setRevokeLoading(false)
-    }
-  }
+  useEffect(() => {
+    load()
+  }, [])
 
   return (
-    <div>
-      <div className="page-header">
-        <h2>Certyfikaty</h2>
-        <p>Lista wszystkich certyfikatów w systemie</p>
+    <div className="card">
+      <div className="page-header" style={{ marginBottom: 16 }}>
+        <h2>Lista wszystkich certyfikatów w systemie</h2>
+        <p>Przegląd aktywnych certyfikatów zapisanych w bazie.</p>
       </div>
 
-      {msg && <div className="alert alert-success">{msg}</div>}
       {error && <div className="alert alert-error">{error}</div>}
 
-      <div className="card" style={{ padding: 0 }}>
-        {loading ? (
-          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Ładowanie...</div>
-        ) : certs.length === 0 ? (
-          <div className="empty-state"><p>Brak certyfikatów w systemie</p></div>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Common Name</th>
-                  <th>Organizacja</th>
-                  <th>Typ</th>
-                  <th>Status</th>
-                  <th>Ważny od</th>
-                  <th>Ważny do</th>
-                  <th>Akcje</th>
-                </tr>
-              </thead>
-              <tbody>
-                {certs.map(c => (
-                  <tr key={c.id}>
-                    <td style={{ fontWeight: 500 }}>{c.common_name}</td>
-                    <td style={{ color: 'var(--text-muted)' }}>{c.organization}</td>
-                    <td><span className={`badge badge-${c.type.toLowerCase()}`}>{c.type}</span></td>
-                    <td><span className={`badge badge-${c.status.toLowerCase()}`}>{c.status}</span></td>
-                    <td style={{ color: 'var(--text-muted)' }}>{new Date(c.not_before).toLocaleDateString('pl-PL')}</td>
-                    <td style={{ color: 'var(--text-muted)' }}>{new Date(c.not_after).toLocaleDateString('pl-PL')}</td>
-                    <td>
-                      <div className="actions">
-                        <button className="btn btn-ghost" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => setSelected(c)}>
-                          Szczegóły
-                        </button>
-                        {c.status === 'VALID' && c.type !== 'ROOT' && (
-                          <button className="btn btn-danger" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => setRevokeId(c.id)}>
-                            Unieważnij
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {selected && (
-        <div className="modal-overlay" onClick={() => setSelected(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Szczegóły certyfikatu</h3>
-              <button className="close-btn" onClick={() => setSelected(null)}>x</button>
-            </div>
-            <div className="detail-grid" style={{ marginBottom: 16 }}>
-              <div className="detail-item">
-                <label>Common Name</label>
-                <span>{selected.common_name}</span>
-              </div>
-              <div className="detail-item">
-                <label>Organizacja</label>
-                <span>{selected.organization}</span>
-              </div>
-              <div className="detail-item">
-                <label>Typ</label>
-                <span><span className={`badge badge-${selected.type.toLowerCase()}`}>{selected.type}</span></span>
-              </div>
-              <div className="detail-item">
-                <label>Status</label>
-                <span><span className={`badge badge-${selected.status.toLowerCase()}`}>{selected.status}</span></span>
-              </div>
-              <div className="detail-item">
-                <label>Ważny od</label>
-                <span>{new Date(selected.not_before).toLocaleString('pl-PL')}</span>
-              </div>
-              <div className="detail-item">
-                <label>Ważny do</label>
-                <span>{new Date(selected.not_after).toLocaleString('pl-PL')}</span>
-              </div>
-              {selected.revoked_at && (
-                <div className="detail-item">
-                  <label>Unieważniony</label>
-                  <span>{new Date(selected.revoked_at).toLocaleString('pl-PL')}</span>
-                </div>
-              )}
-              {selected.revocation_reason && (
-                <div className="detail-item">
-                  <label>Powód unieważnienia</label>
-                  <span>{selected.revocation_reason}</span>
-                </div>
-              )}
-            </div>
-            <div>
-              <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Numer seryjny
-              </label>
-              <div className="mono" style={{ marginTop: 4, marginBottom: 12 }}>{selected.serial_number}</div>
-            </div>
-            <div>
-              <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Certyfikat PEM
-              </label>
-              <div className="pem-box">{selected.pem_data}</div>
-            </div>
-          </div>
+      {loading ? (
+        <p>Ładowanie...</p>
+      ) : certs.length === 0 ? (
+        <div className="empty-state">
+          <p>Brak certyfikatów w systemie.</p>
         </div>
-      )}
-
-      {revokeId && (
-        <div className="modal-overlay" onClick={() => setRevokeId(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Unieważnij certyfikat</h3>
-              <button className="close-btn" onClick={() => setRevokeId(null)}>x</button>
-            </div>
-            <div className="alert alert-error">Ta operacja jest nieodwracalna.</div>
-            <div className="form-group">
-              <label>Powód unieważnienia</label>
-              <select value={revokeReason} onChange={e => setRevokeReason(e.target.value)}>
-                <option value="">unspecified</option>
-                <option value="keyCompromise">keyCompromise</option>
-                <option value="cACompromise">cACompromise</option>
-                <option value="affiliationChanged">affiliationChanged</option>
-                <option value="superseded">superseded</option>
-                <option value="cessationOfOperation">cessationOfOperation</option>
-              </select>
-            </div>
-            <div className="actions" style={{ justifyContent: 'flex-end' }}>
-              <button className="btn btn-ghost" onClick={() => setRevokeId(null)}>Anuluj</button>
-              <button className="btn btn-danger" onClick={handleRevoke} disabled={revokeLoading}>
-                {revokeLoading ? <span className="spinner" /> : null}
-                Unieważnij
-              </button>
-            </div>
-          </div>
+      ) : (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Common Name</th>
+                <th>Organizacja</th>
+                <th>Typ</th>
+                <th>Status</th>
+                <th>Ważny od</th>
+                <th>Ważny do</th>
+                <th>Numer seryjny</th>
+              </tr>
+            </thead>
+            <tbody>
+              {certs.map((c) => (
+                <tr key={c.id}>
+                  <td>{c.common_name || '—'}</td>
+                  <td>{c.organization || '—'}</td>
+                  <td>
+                    <span className={`badge badge-${String(c.type).toLowerCase()}`}>{c.type}</span>
+                  </td>
+                  <td>
+                    <span className={`badge badge-${String(c.status).toLowerCase()}`}>{c.status}</span>
+                  </td>
+                  <td>{c.not_before ? new Date(c.not_before).toLocaleDateString('pl-PL') : '—'}</td>
+                  <td>{c.not_after ? new Date(c.not_after).toLocaleDateString('pl-PL') : '—'}</td>
+                  <td className="mono">{c.serial_number}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

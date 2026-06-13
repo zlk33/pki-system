@@ -23,50 +23,58 @@ export default function Dashboard({ onNavigate }: Props) {
     })
   }, [])
 
-  const rootCA = certs.find(c => c.type === 'ROOT')
-  const valid = certs.filter(c => c.status === 'VALID').length
-  const revoked = certs.filter(c => c.status === 'REVOKED').length
-  const pending = requests.filter(r => r.status === 'PENDING').length
+  const rootCA = certs.find((c) => c.type === 'ROOT')
+  const valid = certs.filter((c) => c.status === 'VALID').length
+  const revoked = certs.filter((c) => c.status === 'REVOKED').length
+  const pending = requests.filter((r) => r.status === 'PENDING').length
 
   const stats = [
-    { label: 'Wszystkie certyfikaty', value: certs.length, color: 'var(--accent)', action: () => onNavigate('certificates') },
-    { label: 'Ważne', value: valid, color: 'var(--success)', action: () => onNavigate('certificates') },
-    { label: 'Unieważnione', value: revoked, color: 'var(--error)', action: () => onNavigate('certificates') },
-    { label: 'Oczekujące żądania', value: pending, color: 'var(--warning)', action: () => onNavigate('requests') },
+    { label: 'Wszystkie certyfikaty', value: certs.length, action: () => onNavigate('certificates') },
+    { label: 'Ważne', value: valid, action: () => onNavigate('certificates') },
+    { label: 'Unieważnione', value: revoked, action: () => onNavigate('certificates') },
+    { label: 'Oczekujące żądania', value: pending, action: () => onNavigate('requests') },
   ]
 
   return (
-    <div>
+    <>
       <div className="page-header">
         <h2>Pulpit</h2>
-        <p>Przegląd stanu infrastruktury PKI</p>
+        <p>Przegląd stanu infrastruktury PKI.</p>
       </div>
 
       {loading ? (
-        <div style={{ color: 'var(--text-muted)', padding: '40px 0' }}>Ładowanie...</div>
+        <div className="card">
+          <p>Ładowanie...</p>
+        </div>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-            {stats.map(s => (
-              <div
-                key={s.label}
-                className="card"
-                style={{ cursor: 'pointer', marginBottom: 0 }}
-                onClick={s.action}
-              >
-                <div style={{ fontSize: 32, fontWeight: 700, color: s.color }}>{s.value}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{s.label}</div>
-              </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: 16,
+              marginBottom: 20,
+            }}
+          >
+            {stats.map((s) => (
+              <button key={s.label} className="card" onClick={s.action} style={{ textAlign: 'left', marginBottom: 0 }}>
+                <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 6 }}>{s.value}</div>
+                <div style={{ color: 'var(--text-muted)' }}>{s.label}</div>
+              </button>
             ))}
           </div>
 
           <div className="card">
-            <div className="card-title">Status Root CA</div>
+            <div className="page-header" style={{ marginBottom: 16 }}>
+              <h2>Status Root CA</h2>
+              <p>Główny urząd certyfikacji i korzeń zaufania systemu.</p>
+            </div>
+
             {rootCA ? (
               <div className="detail-grid">
                 <div className="detail-item">
                   <label>Status</label>
-                  <span><span className="badge badge-valid">AKTYWNY</span></span>
+                  <span className="badge badge-valid">AKTYWNY</span>
                 </div>
                 <div className="detail-item">
                   <label>Common Name</label>
@@ -78,31 +86,28 @@ export default function Dashboard({ onNavigate }: Props) {
                 </div>
                 <div className="detail-item">
                   <label>Numer seryjny</label>
-                  <span className="mono">{rootCA.serial_number.slice(0, 24)}...</span>
+                  <span className="mono">{rootCA.serial_number}</span>
                 </div>
               </div>
             ) : (
-              <div>
-                <div className="alert alert-info" style={{ marginBottom: 12 }}>
-                  Root CA nie zostało jeszcze zainicjowane.
-                </div>
+              <>
+                <div className="alert alert-info">Root CA nie zostało jeszcze zainicjowane.</div>
                 <button className="btn btn-primary" onClick={() => onNavigate('ca')}>
                   Inicjalizuj Root CA
                 </button>
-              </div>
+              </>
             )}
           </div>
 
           <div className="card">
-            <div className="card-title">
-              Ostatnie certyfikaty
-              <button className="btn btn-ghost" style={{ marginLeft: 'auto', fontSize: 12, padding: '4px 10px' }} onClick={() => onNavigate('certificates')}>
-                Wszystkie
-              </button>
+            <div className="page-header" style={{ marginBottom: 16 }}>
+              <h2>Ostatnie certyfikaty</h2>
+              <p>Pięć najnowszych wystawionych certyfikatów.</p>
             </div>
-            {certs.filter(c => c.type !== 'ROOT').length === 0 ? (
+
+            {certs.filter((c) => c.type !== 'ROOT').length === 0 ? (
               <div className="empty-state">
-                <p>Brak wystawionych certyfikatów</p>
+                <p>Brak wystawionych certyfikatów.</p>
               </div>
             ) : (
               <div className="table-wrap">
@@ -116,14 +121,19 @@ export default function Dashboard({ onNavigate }: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {certs.filter(c => c.type !== 'ROOT').slice(0, 5).map(c => (
-                      <tr key={c.id}>
-                        <td>{c.common_name}</td>
-                        <td><span className={`badge badge-${c.type.toLowerCase()}`}>{c.type}</span></td>
-                        <td><span className={`badge badge-${c.status.toLowerCase()}`}>{c.status}</span></td>
-                        <td>{new Date(c.not_after).toLocaleDateString('pl-PL')}</td>
-                      </tr>
-                    ))}
+                    {certs
+                      .filter((c) => c.type !== 'ROOT')
+                      .slice(0, 5)
+                      .map((c) => (
+                        <tr key={c.id}>
+                          <td>{c.common_name}</td>
+                          <td>{c.type}</td>
+                          <td>
+                            <span className={`badge badge-${String(c.status).toLowerCase()}`}>{c.status}</span>
+                          </td>
+                          <td>{new Date(c.not_after).toLocaleDateString('pl-PL')}</td>
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
               </div>
@@ -131,6 +141,6 @@ export default function Dashboard({ onNavigate }: Props) {
           </div>
         </>
       )}
-    </div>
+    </>
   )
 }
