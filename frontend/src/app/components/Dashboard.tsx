@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { api, Certificate, CertRequest } from '../api'
 
 interface Props {
-  onNavigate: (page: 'dashboard' | 'certificates' | 'issue' | 'requests' | 'ca') => void
+  onNavigate: (page: 'dashboard' | 'certificates' | 'issue' | 'requests' | 'ca' | 'sign' | 'verify' | 'users' | 'audit') => void
 }
 
 export default function Dashboard({ onNavigate }: Props) {
@@ -23,122 +23,45 @@ export default function Dashboard({ onNavigate }: Props) {
     })
   }, [])
 
-  const rootCA = certs.find((c) => c.type === 'ROOT')
-  const valid = certs.filter((c) => c.status === 'VALID').length
-  const revoked = certs.filter((c) => c.status === 'REVOKED').length
-  const pending = requests.filter((r) => r.status === 'PENDING').length
+  const rootCA = certs.find(c => c.type === 'ROOT')
+  const valid = certs.filter(c => c.status === 'VALID').length
+  const revoked = certs.filter(c => c.status === 'REVOKED').length
+  const pending = requests.filter(r => r.status === 'PENDING').length
 
   const stats = [
-    {
-      label: 'Wszystkie certyfikaty',
-      value: certs.length,
-      color: 'var(--accent)',
-      action: () => onNavigate('certificates'),
-    },
-    {
-      label: 'Ważne',
-      value: valid,
-      color: 'var(--success)',
-      action: () => onNavigate('certificates'),
-    },
-    {
-      label: 'Unieważnione',
-      value: revoked,
-      color: 'var(--error)',
-      action: () => onNavigate('certificates'),
-    },
-    {
-      label: 'Oczekujące żądania',
-      value: pending,
-      color: 'var(--warning)',
-      action: () => onNavigate('requests'),
-    },
+    { label: 'Wszystkie certyfikaty', value: certs.length, color: 'var(--accent)', action: () => onNavigate('certificates') },
+    { label: 'Ważne', value: valid, color: 'var(--success)', action: () => onNavigate('certificates') },
+    { label: 'Unieważnione', value: revoked, color: 'var(--error)', action: () => onNavigate('certificates') },
+    { label: 'Oczekujące żądania', value: pending, color: 'var(--warning)', action: () => onNavigate('requests') },
   ]
 
   return (
-    <>
+    <div>
       <div className="page-header">
         <h2>Pulpit</h2>
-        <p>Przegląd stanu infrastruktury PKI.</p>
+        <p>Przegląd stanu infrastruktury PKI</p>
       </div>
 
       {loading ? (
-        <div className="card">
-          <p>Ładowanie...</p>
-        </div>
+        <div style={{ color: 'var(--text-muted)', padding: '40px 0' }}>Ładowanie...</div>
       ) : (
         <>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-              gap: 16,
-              marginBottom: 20,
-            }}
-          >
-            {stats.map((s) => (
-              <button
-                key={s.label}
-                className="card"
-                onClick={s.action}
-                style={{
-                  textAlign: 'left',
-                  marginBottom: 0,
-                  cursor: 'pointer',
-                  border: `1px solid ${s.color}`,
-                  background: `linear-gradient(180deg, ${s.color}15 0%, var(--surface) 55%)`,
-                  boxShadow: `inset 0 1px 0 ${s.color}22`,
-                  transition: 'transform 0.15s ease, border-color 0.15s ease, background 0.15s ease',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)'
-                  e.currentTarget.style.borderColor = s.color
-                  e.currentTarget.style.background = `linear-gradient(180deg, ${s.color}22 0%, var(--surface) 60%)`
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.borderColor = s.color
-                  e.currentTarget.style.background = `linear-gradient(180deg, ${s.color}15 0%, var(--surface) 55%)`
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 28,
-                    fontWeight: 700,
-                    marginBottom: 6,
-                    color: s.color,
-                  }}
-                >
-                  {s.value}
-                </div>
-
-                <div style={{ color: 'var(--text)' }}>{s.label}</div>
-
-                <div
-                  style={{
-                    width: 36,
-                    height: 4,
-                    borderRadius: 999,
-                    marginTop: 14,
-                    background: s.color,
-                    opacity: 0.9,
-                  }}
-                />
-              </button>
+          <div className="stats-grid">
+            {stats.map(s => (
+              <div key={s.label} className="stat-card" onClick={s.action}>
+                <div className="stat-value" style={{ color: s.color }}>{s.value}</div>
+                <div className="stat-label">{s.label}</div>
+              </div>
             ))}
           </div>
 
           <div className="card">
-            <div className="page-header" style={{ marginBottom: 16 }}>
-              <h2>Status Root CA</h2>
-              <p>Główny urząd certyfikacji i korzeń zaufania systemu.</p>
-            </div>
-
+            <div className="card-title">Status Root CA</div>
             {rootCA ? (
               <div className="detail-grid">
                 <div className="detail-item">
                   <label>Status</label>
-                  <span className="badge badge-valid">AKTYWNY</span>
+                  <span><span className="badge badge-valid">AKTYWNY</span></span>
                 </div>
                 <div className="detail-item">
                   <label>Common Name</label>
@@ -146,32 +69,39 @@ export default function Dashboard({ onNavigate }: Props) {
                 </div>
                 <div className="detail-item">
                   <label>Ważny do</label>
-                  <span>{new Date(rootCA.not_after).toLocaleDateString('pl-PL')}</span>
+                  <span>{new Date(rootCA.not_after!).toLocaleDateString('pl-PL')}</span>
                 </div>
                 <div className="detail-item">
                   <label>Numer seryjny</label>
-                  <span className="mono">{rootCA.serial_number}</span>
+                  <span className="mono">{rootCA.serial_number.slice(0, 24)}...</span>
                 </div>
               </div>
             ) : (
-              <>
-                <div className="alert alert-info">Root CA nie zostało jeszcze zainicjowane.</div>
+              <div>
+                <div className="alert alert-info" style={{ marginBottom: 12 }}>
+                  Root CA nie zostało jeszcze zainicjowane.
+                </div>
                 <button className="btn btn-primary" onClick={() => onNavigate('ca')}>
                   Inicjalizuj Root CA
                 </button>
-              </>
+              </div>
             )}
           </div>
 
           <div className="card">
-            <div className="page-header" style={{ marginBottom: 16 }}>
-              <h2>Ostatnie certyfikaty</h2>
-              <p>Pięć najnowszych wystawionych certyfikatów.</p>
+            <div className="card-title">
+              Ostatnie certyfikaty
+              <button
+                className="btn btn-ghost"
+                style={{ marginLeft: 'auto', fontSize: 12, padding: '6px 12px' }}
+                onClick={() => onNavigate('certificates')}
+              >
+                Wszystkie
+              </button>
             </div>
-
-            {certs.filter((c) => c.type !== 'ROOT').length === 0 ? (
+            {certs.filter(c => c.type !== 'ROOT').length === 0 ? (
               <div className="empty-state">
-                <p>Brak wystawionych certyfikatów.</p>
+                <p>Brak wystawionych certyfikatów</p>
               </div>
             ) : (
               <div className="table-wrap">
@@ -185,19 +115,14 @@ export default function Dashboard({ onNavigate }: Props) {
                     </tr>
                   </thead>
                   <tbody>
-                    {certs
-                      .filter((c) => c.type !== 'ROOT')
-                      .slice(0, 5)
-                      .map((c) => (
-                        <tr key={c.id}>
-                          <td>{c.common_name}</td>
-                          <td>{c.type}</td>
-                          <td>
-                            <span className={`badge badge-${String(c.status).toLowerCase()}`}>{c.status}</span>
-                          </td>
-                          <td>{new Date(c.not_after).toLocaleDateString('pl-PL')}</td>
-                        </tr>
-                      ))}
+                    {certs.filter(c => c.type !== 'ROOT').slice(0, 5).map(c => (
+                      <tr key={c.id}>
+                        <td>{c.common_name}</td>
+                        <td><span className={`badge badge-${c.type.toLowerCase()}`}>{c.type}</span></td>
+                        <td><span className={`badge badge-${c.status.toLowerCase()}`}>{c.status}</span></td>
+                        <td>{new Date(c.not_after!).toLocaleDateString('pl-PL')}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -205,6 +130,6 @@ export default function Dashboard({ onNavigate }: Props) {
           </div>
         </>
       )}
-    </>
+    </div>
   )
 }

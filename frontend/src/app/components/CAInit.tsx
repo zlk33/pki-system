@@ -5,8 +5,10 @@ import { api } from '../api'
 
 export default function CAInit() {
   const [loading, setLoading] = useState(false)
+  const [crlLoading, setCrlLoading] = useState(false)
   const [result, setResult] = useState<{ message: string; serial_number: string } | null>(null)
   const [error, setError] = useState('')
+  const [crlMsg, setCrlMsg] = useState('')
 
   const handleInit = async () => {
     setLoading(true)
@@ -19,6 +21,20 @@ export default function CAInit() {
       setError(e instanceof Error ? e.message : 'Nieznany błąd')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDownloadCrl = async () => {
+    setCrlLoading(true)
+    setCrlMsg('')
+    setError('')
+    try {
+      await api.downloadCrl()
+      setCrlMsg('Lista CRL została pobrana (studenckie-pki.crl.pem)')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Błąd pobierania CRL')
+    } finally {
+      setCrlLoading(false)
     }
   }
 
@@ -82,6 +98,19 @@ export default function CAInit() {
             <span>Wolumen Docker (/app/certs)</span>
           </div>
         </div>
+      </div>
+
+      <div className="card">
+        <div className="card-title">Lista unieważnień (CRL)</div>
+        <p style={{ color: 'var(--text-muted)', marginBottom: 16, fontSize: 13 }}>
+          Certificate Revocation List zawiera numery seryjne wszystkich unieważnionych certyfikatów,
+          podpisaną przez Root CA. Można ją dystrybuować klientom weryfikującym łańcuch zaufania.
+        </p>
+        {crlMsg && <div className="alert alert-success">{crlMsg}</div>}
+        <button className="btn btn-ghost" onClick={handleDownloadCrl} disabled={crlLoading}>
+          {crlLoading ? <span className="spinner" /> : null}
+          {crlLoading ? 'Generowanie...' : 'Pobierz CRL (PEM)'}
+        </button>
       </div>
     </div>
   )

@@ -4,3 +4,5 @@ __pycache__/
 /backend/certs/
 /db-data/
 venv/
+docs/generated/
+docs/fonts/

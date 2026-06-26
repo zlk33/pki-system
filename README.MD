@@ -1,241 +1,259 @@
 # Studenckie PKI
 
-Studenckie PKI to edukacyjny system zarządzania infrastrukturą klucza publicznego, zbudowany jako aplikacja webowa uruchamiana przez Docker Compose. Warstwa interfejsu użytkownika została przygotowana w Next.js, jednak zasadnicza logika projektu została zaimplementowana po stronie backendu w Pythonie z użyciem FastAPI, SQLAlchemy oraz biblioteki `cryptography`, ponieważ to backend realizuje generowanie kluczy, obsługę CSR, podpisywanie certyfikatów, walidację przepływu oraz komunikację z bazą danych.
+Edukacyjny system zarządzania infrastrukturą klucza publicznego (PKI) z panelem webowym. Projekt uruchamia się lokalnie przez Docker Compose i obejmuje pełny przepływ: Root CA, certyfikaty użytkowników, podpisywanie dokumentów, weryfikację podpisów, CRL oraz dziennik zdarzeń.
 
-Projekt spełnia założenie przedmiotu, w którym główny nacisk ma być położony na wykorzystanie języka Python. Frontend pełni przede wszystkim rolę panelu administracyjnego i warstwy prezentacji, natomiast najważniejsze operacje PKI, takie jak inicjalizacja Root CA, podpisywanie certyfikatów, generowanie certyfikatów z formularza, unieważnianie certyfikatów oraz obsługa statusów żądań, są wykonywane w backendzie napisanym w Pythonie.
+**Stack:** Python (FastAPI) + PostgreSQL + Next.js + Docker
 
-## Zakres projektu
+Główna logika kryptograficzna i biznesowa jest zaimplementowana w **Pythonie** (`cryptography`, SQLAlchemy). Frontend pełni rolę panelu użytkownika i administratora.
 
-Aplikacja obsługuje podstawowy, ale już rozszerzony przepływ pracy dla lokalnego, edukacyjnego PKI:
+## Funkcjonalności
 
-- inicjalizację Root CA przez panel administracyjny,
-- zapis żądań CSR do bazy danych,
-- przegląd i zarządzanie żądaniami certyfikatów,
-- zatwierdzanie żądań i generowanie certyfikatów podpisanych przez Root CA,
-- odrzucanie żądań CSR,
-- generowanie certyfikatu bez ręcznego CSR, bezpośrednio z formularza w panelu,
-- przegląd listy wystawionych certyfikatów,
-- podgląd szczegółów pojedynczego certyfikatu,
-- pobieranie certyfikatu PEM z poziomu interfejsu,
-- unieważnianie certyfikatów wraz z zapisaniem powodu unieważnienia.
+### Uwierzytelnianie i role
+
+- rejestracja i logowanie (JWT Bearer),
+- pierwszy zarejestrowany użytkownik otrzymuje rolę **admin**,
+- role: `admin` (pełny panel) i `user` (własne certyfikaty, podpisy).
+
+### Root CA i certyfikaty
+
+- inicjalizacja Root CA (RSA-2048, certyfikat samopodpisany),
+- składanie żądań CSR i ich zatwierdzanie / odrzucanie,
+- wystawianie certyfikatu na podstawie CSR,
+- wystawianie certyfikatu dla użytkownika przez admina (generacja klucza na serwerze),
+- przegląd certyfikatów, pobieranie PEM i klucza prywatnego,
+- unieważnianie certyfikatów z podaniem powodu.
+
+### Podpisy dokumentów
+
+- podpisywanie plików (RSA-SHA256, format `studenckie-pki-v2`),
+- pobieranie pliku podpisu `.pki.sig.json` (podpis odłączony + znacznik czasu),
+- weryfikacja podpisu przez upload oryginału i pliku podpisu,
+- historia podpisanych dokumentów w bazie.
+
+### Administracja
+
+- zarządzanie użytkownikami (CRUD, reset hasła, zmiana roli),
+- pobieranie **CRL** (Certificate Revocation List) w formacie PEM,
+- **dziennik zdarzeń** (audit log) — kto, co i kiedy wykonał w systemie.
 
 ## Architektura
 
-Projekt składa się z trzech usług uruchamianych przez Docker Compose:
+```
+┌─────────────┐     REST + JWT      ┌──────────────┐     SQL      ┌────────────┐
+│  Frontend   │ ◄─────────────────► │   Backend    │ ◄──────────► │ PostgreSQL │
+│  Next.js    │   localhost:8000  │   FastAPI    │              │            │
+│  :3000      │                   │   Python     │              │            │
+└─────────────┘                   └──────┬───────┘              └────────────┘
+                                         │
+                                  /app/certs (wolumen Docker)
+```
 
 | Usługa | Technologia | Port | Rola |
 | --- | --- | --- | --- |
-| `db` | PostgreSQL 15 Alpine | `5432` | Przechowywanie certyfikatów i żądań CSR. |
-| `backend` | Python + FastAPI + SQLAlchemy + cryptography | `8000` | Główna logika systemu PKI, wystawianie certyfikatów, obsługa Root CA i API. |
-| `frontend` | Next.js / Node 20 Alpine | `3000` | Panel administracyjny do obsługi CA, żądań i certyfikatów. |
+| `db` | PostgreSQL 15 | `5432` | Użytkownicy, certyfikaty, żądania, podpisy, audit |
+| `backend` | FastAPI + SQLAlchemy + cryptography | `8000` | API, kryptografia, logika PKI |
+| `frontend` | Next.js | `3000` | Panel webowy |
 
-Najważniejszą częścią projektu jest backend. To właśnie tam wykonywane są operacje kryptograficzne i biznesowe: generowanie klucza Root CA, podpisywanie certyfikatów z CSR, generowanie pary klucz prywatny + certyfikat z formularza, pobieranie danych z PostgreSQL, walidacja statusów `PENDING`, `APPROVED`, `REJECTED`, `VALID` i `REVOKED` oraz wystawianie odpowiedzi REST API dla frontendu.
+### Moduły backendu (`backend/app/`)
 
-Backend zapisuje klucz prywatny Root CA w katalogu `/app/certs`. Katalog ten jest mapowany do wolumenu `certs_data`, dzięki czemu dane pozostają dostępne po restarcie kontenerów.
+| Plik | Odpowiedzialność |
+| --- | --- |
+| `main.py` | REST API, auth JWT, orchestracja |
+| `ca_manager.py` | Generowanie Root CA |
+| `cert_manager.py` | Podpisywanie CSR, wystawianie certyfikatów |
+| `crl_manager.py` | Generowanie CRL (PEM) |
+| `audit.py` | Zapis i odczyt dziennika zdarzeń |
+| `db.py` | Modele SQLAlchemy |
 
-## Wykorzystanie Pythona
+### Komponenty frontendu (`frontend/src/app/components/`)
 
-Projekt został zaprojektowany w taki sposób, aby najważniejsze elementy rozwiązania były zrealizowane w Pythonie. Python nie jest tutaj dodatkiem pomocniczym, ale centralnym elementem systemu.
-
-Po stronie Pythona zostały zaimplementowane między innymi:
-
-- definicja REST API w FastAPI,
-- modele danych wejściowych i walidacja przy pomocy Pydantic,
-- połączenie z PostgreSQL i operacje na bazie przez SQLAlchemy,
-- inicjalizacja urzędu certyfikacji Root CA,
-- generowanie kluczy i certyfikatów przy użyciu biblioteki `cryptography`,
-- podpisywanie certyfikatów na podstawie CSR,
-- generowanie certyfikatu bezpośrednio z formularza, bez ręcznego CSR,
-- unieważnianie certyfikatów i zapis powodu unieważnienia,
-- logika statusów żądań i certyfikatów,
-- udostępnienie danych dla panelu frontendowego przez endpointy API.
-
-Frontend nie wykonuje operacji kryptograficznych. Jego zadaniem jest wyłącznie zebranie danych od użytkownika i przesłanie ich do backendu, a następnie wyświetlenie odpowiedzi zwróconej przez system napisany w Pythonie.
+`Dashboard`, `CAInit`, `Certificates`, `IssueCert`, `Requests`, `SignDocuments`, `VerifySignature`, `Users`, `AuditLog`
 
 ## Endpointy API
 
-Backend udostępnia następujące endpointy:
+### Auth
 
 | Metoda | Endpoint | Opis |
 | --- | --- | --- |
-| `POST` | `/api/ca/init` | Inicjalizacja Root CA. |
-| `POST` | `/api/certs/request` | Zapis żądania CSR. |
-| `GET` | `/api/requests` | Pobranie listy żądań CSR. |
-| `POST` | `/api/requests/{request_id}/reject` | Odrzucenie żądania CSR. |
-| `GET` | `/api/certificates` | Pobranie listy certyfikatów. |
-| `GET` | `/api/certificates/{certificate_id}` | Pobranie szczegółów pojedynczego certyfikatu. |
-| `GET` | `/api/certificates/{certificate_id}/pem` | Pobranie certyfikatu PEM. |
-| `POST` | `/api/certificates/issue` | Wystawienie certyfikatu na podstawie `request_id`. |
-| `POST` | `/api/certs/approve/{request_id}` | Alternatywne zatwierdzenie żądania i wystawienie certyfikatu. |
-| `POST` | `/api/certificates/generate` | Generowanie nowego certyfikatu i klucza prywatnego bez ręcznego CSR. |
-| `POST` | `/api/certificates/{certificate_id}/revoke` | Unieważnienie certyfikatu z podaniem powodu. |
+| `POST` | `/api/auth/register` | Rejestracja (pierwszy user = admin) |
+| `POST` | `/api/auth/login` | Logowanie, zwraca JWT |
+| `GET` | `/api/auth/me` | Dane zalogowanego użytkownika |
 
-Frontend korzysta z następującej konfiguracji środowiskowej:
+### Użytkownicy (admin)
 
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
+| Metoda | Endpoint | Opis |
+| --- | --- | --- |
+| `GET` | `/api/users` | Lista użytkowników |
+| `POST` | `/api/users` | Utworzenie użytkownika |
+| `PATCH` | `/api/users/{user_id}` | Edycja (rola, dane) |
+| `POST` | `/api/users/{user_id}/reset-password` | Reset hasła |
+| `DELETE` | `/api/users/{user_id}` | Usunięcie użytkownika |
 
-## Struktura danych
+### PKI
 
-System wykorzystuje dwie główne tabele oraz powiązane statusy biznesowe obsługiwane przez backend.
+| Metoda | Endpoint | Opis |
+| --- | --- | --- |
+| `POST` | `/api/ca/init` | Inicjalizacja Root CA |
+| `POST` | `/api/certs/request` | Złożenie żądania CSR |
+| `GET` | `/api/requests` | Lista żądań CSR |
+| `POST` | `/api/requests/{request_id}/reject` | Odrzucenie żądania |
+| `GET` | `/api/certificates` | Lista certyfikatów |
+| `GET` | `/api/certificates/{certificate_id}/private-key` | Pobranie klucza PEM |
+| `POST` | `/api/certificates/issue` | Wystawienie certyfikatu z requestu |
+| `POST` | `/api/certs/approve/{request_id}` | Zatwierdzenie CSR i wystawienie |
+| `POST` | `/api/certificates/issue-for-user` | Wystawienie certyfikatu dla użytkownika |
+| `POST` | `/api/certificates/{certificate_id}/revoke` | Unieważnienie certyfikatu |
+| `GET` | `/api/crl` | Pobranie CRL (PEM) |
 
-### requests
+### Dokumenty i podpisy
 
-Tabela przechowuje informacje o zgłoszonych żądaniach certyfikatów:
+| Metoda | Endpoint | Opis |
+| --- | --- | --- |
+| `GET` | `/api/documents` | Lista podpisanych dokumentów |
+| `POST` | `/api/documents/sign` | Podpisanie pliku |
+| `GET` | `/api/documents/{document_id}/package` | Pobranie pakietu podpisu |
+| `POST` | `/api/documents/verify` | Weryfikacja (metadane z bazy) |
+| `POST` | `/api/documents/verify-package` | Weryfikacja uploadem plików |
 
-- `common_name`,
-- `status`,
-- `csr_pem_data`,
-- `created_at`.
+### Audyt
 
-Status żądania może przyjmować wartości `PENDING`, `APPROVED` albo `REJECTED`.
+| Metoda | Endpoint | Opis |
+| --- | --- | --- |
+| `GET` | `/api/audit-logs` | Dziennik zdarzeń (admin) |
 
-### certificates
+Interaktywna dokumentacja: http://localhost:8000/docs
 
-Tabela przechowuje wystawione certyfikaty oraz ich stan:
+## Struktura bazy danych
 
-- numer seryjny,
-- `common_name`,
-- organizację,
-- typ certyfikatu,
-- status certyfikatu,
-- daty ważności,
-- certyfikat w formacie PEM,
-- datę unieważnienia,
-- powód unieważnienia.
+| Tabela | Zawartość |
+| --- | --- |
+| `users` | Konta, hasła (hash), role |
+| `certificates` | Certyfikaty PEM, status, unieważnienie, właściciel |
+| `requests` | Żądania CSR (`PENDING` / `APPROVED` / `REJECTED`) |
+| `signed_documents` | Metadane podpisów dokumentów |
+| `audit_logs` | Historia operacji w systemie |
 
-Status certyfikatu może przyjmować wartości `VALID`, `REVOKED` albo `EXPIRED`.
+Schemat początkowy: `db/init.sql`
 
 ## Uruchomienie
 
 ### Wymagania
 
-- Docker,
-- Docker Compose.
+- Docker
+- Docker Compose
 
-### Start projektu
-
-Uruchom wszystkie usługi:
+### Start
 
 ```bash
 docker compose up --build
 ```
 
-Frontend będzie dostępny pod adresem:
+| Usługa | Adres |
+| --- | --- |
+| Panel webowy | http://localhost:3000 |
+| API (Swagger) | http://localhost:8000/docs |
 
-```text
-http://localhost:3000
-```
+Zmienna środowiskowa frontendu:
 
-Dokumentacja API:
-
-```text
-http://localhost:8000/docs
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
 ### Restart po zmianach
-
-Po zmianach w backendzie lub frontendzie zalecany jest pełny restart:
 
 ```bash
 docker compose down
 docker compose up --build
 ```
 
-## Korzystanie z aplikacji
+## Scenariusz użytkowania
 
-### 1. Inicjalizacja Root CA
+1. **Rejestracja** — pierwszy użytkownik zostaje administratorem.
+2. **Root CA** — admin inicjalizuje urząd certyfikacji (jednorazowo).
+3. **Użytkownicy** — admin tworzy konta lub użytkownicy rejestrują się sami.
+4. **Certyfikat** — admin wystawia certyfikat dla użytkownika *lub* użytkownik składa CSR i czeka na zatwierdzenie.
+5. **Podpis** — użytkownik wgrywa dokument, pobiera plik `.pki.sig.json`.
+6. **Weryfikacja** — na dowolnym komputerze: upload oryginału + pliku podpisu.
+7. **CRL** — admin pobiera listę unieważnionych certyfikatów.
+8. **Audit** — admin przegląda dziennik wszystkich operacji.
 
-W zakładce **Root CA** należy uruchomić inicjalizację urzędu certyfikacji. Operacja generuje klucz RSA 2048 bitów, tworzy samopodpisany certyfikat Root CA i zapisuje klucz prywatny na trwałym wolumenie Dockera.
+## Format podpisu (`studenckie-pki-v2`)
 
-Root CA może zostać utworzony tylko raz. Ponowna próba inicjalizacji zwraca błąd HTTP `400`.
+Plik `.pki.sig.json` zawiera m.in.:
 
-### 2. Dodanie żądania CSR
+- hash SHA-256 dokumentu,
+- podpis RSA-SHA256,
+- podpis znacznika czasu (`signed_at`),
+- certyfikat PEM podpisującego.
 
-W zakładce **Żądania CSR** można przełączyć się między listą żądań a formularzem **Prześlij CSR**. Formularz przyjmuje `common_name` oraz CSR w formacie PEM i wysyła dane do endpointu `POST /api/certs/request`.
+Oryginalny dokument nie jest modyfikowany — to podpis odłączony (detached signature).
 
-Nowe żądanie otrzymuje status `PENDING` i pojawia się na liście requestów w panelu.
+## Dokumentacja i prezentacja
 
-### 3. Zatwierdzenie lub odrzucenie żądania
+W repozytorium znajdują się materiały do obrony projektu:
 
-Żądanie CSR można zatwierdzić albo odrzucić z poziomu listy żądań w panelu. Przy zatwierdzeniu backend pobiera zapisany CSR, podpisuje go przy użyciu Root CA, zapisuje nowy certyfikat w bazie danych i zmienia status requestu na `APPROVED`.
+| Plik | Opis |
+| --- | --- |
+| `docs/PREZENTACJA.md` | Prezentacja ze skryptem do wygłoszenia (16 slajdów) |
+| `scripts/generate_documentation.py` | Generator HTML + PDF ze strukturą i kodem wszystkich plików |
 
-Odrzucenie żądania zmienia jego status na `REJECTED`, bez wystawiania certyfikatu.
+### Generowanie PDF z kodem źródłowym
 
-### 4. Wystawienie certyfikatu na podstawie requestu
+**Windows (dwuklik):**
 
-Zakładka **Wystaw certyfikat** pozwala na wystawienie certyfikatu na podstawie wcześniej zapisanego requestu CSR. Ten wariant odwzorowuje klasyczny przepływ PKI, w którym klucz prywatny i CSR powstają po stronie klienta, a urząd certyfikacji podpisuje gotowe żądanie.
+```text
+scripts\generate_documentation.bat
+```
 
-### 5. Generowanie certyfikatu z formularza
+**Ręcznie:**
 
-Dodany został również uproszczony tryb pracy: **Generuj z formularza**. W tym wariancie użytkownik podaje `common_name`, organizację i typ certyfikatu, a backend sam generuje parę kluczy oraz podpisany certyfikat bez potrzeby ręcznego tworzenia CSR.
+```bash
+pip install -r scripts/requirements-docs.txt
+python scripts/generate_documentation.py
+```
 
-To rozwiązanie ma charakter demonstracyjny i edukacyjny. W środowisku produkcyjnym klucz prywatny nie powinien być standardowo generowany i zwracany przez backend, natomiast na potrzeby projektu uczelnianego upraszcza to prezentację działania systemu PKI.
+Wynik:
 
-### 6. Przegląd i szczegóły certyfikatów
+- `docs/generated/studenckie-pki-dokumentacja.html` — pełna dokumentacja (prezentacja + README + drzewo plików + kod)
+- `docs/generated/studenckie-pki-dokumentacja.pdf` — wersja PDF (wymaga `fpdf2`)
 
-Zakładka **Certyfikaty** wyświetla wszystkie certyfikaty wraz z typem, statusem i zakresem ważności. Z poziomu tabeli dostępne są akcje wyświetlenia szczegółów, pobrania certyfikatu PEM oraz unieważnienia certyfikatu, jeśli jego status to `VALID` i nie jest to Root CA.
-
-Modal szczegółów pokazuje między innymi numer seryjny, daty ważności, status, dane PEM oraz informacje o ewentualnym unieważnieniu.
-
-### 7. Unieważnianie certyfikatów
-
-System obsługuje unieważnianie certyfikatów z poziomu panelu administracyjnego. Backend zapisuje status `REVOKED`, datę unieważnienia oraz powód unieważnienia.
-
-Root CA nie może zostać unieważnione z poziomu panelu, co jest zabezpieczeniem logicznym w implementacji backendu.
+Jeśli PDF nie powstanie automatycznie, otwórz plik HTML w przeglądarce i użyj **Ctrl+P → Zapisz jako PDF**.
 
 ## Zaimplementowane funkcjonalności
 
 | Funkcjonalność | Status |
 | --- | --- |
 | Docker Compose | ✅ |
-| PostgreSQL jako warstwa trwałego składowania | ✅ |
-| Backend REST API w Pythonie (FastAPI) | ✅ |
-| Obsługa bazy danych przez SQLAlchemy | ✅ |
-| Operacje kryptograficzne przez bibliotekę `cryptography` | ✅ |
-| Inicjalizacja Root CA | ✅ |
-| Trwałe przechowywanie klucza Root CA | ✅ |
-| Obsługa CORS | ✅ |
-| Dodawanie CSR | ✅ |
-| Lista żądań CSR | ✅ |
-| Zatwierdzanie żądań CSR | ✅ |
-| Odrzucanie żądań CSR | ✅ |
-| Wystawianie certyfikatów z CSR | ✅ |
-| Generowanie certyfikatu z formularza bez ręcznego CSR | ✅ |
-| Lista certyfikatów | ✅ |
-| Szczegóły pojedynczego certyfikatu | ✅ |
-| Pobieranie certyfikatu PEM z UI | ✅ |
+| PostgreSQL | ✅ |
+| Backend Python (FastAPI) | ✅ |
+| Uwierzytelnianie JWT + role | ✅ |
+| Zarządzanie użytkownikami | ✅ |
+| Root CA | ✅ |
+| CSR, wystawianie certyfikatów | ✅ |
 | Unieważnianie certyfikatów | ✅ |
-| Dashboard ze statystykami | ✅ |
-| Panel administracyjny w Next.js | ✅ |
+| CRL (PEM) | ✅ |
+| Podpisywanie dokumentów | ✅ |
+| Weryfikacja podpisów (upload) | ✅ |
+| Dziennik zdarzeń (audit log) | ✅ |
+| Pobieranie klucza prywatnego PEM | ✅ |
+| Panel Next.js (desktop + mobile) | ✅ |
 
-## Ograniczenia i uproszczenia
+## Ograniczenia (świadome uproszczenia)
 
-| Funkcjonalność | Status |
+| Aspekt | Uwagi |
 | --- | --- |
-| Uwierzytelnianie i autoryzacja użytkowników | ❌ |
-| Obsługa CRL lub OCSP | ❌ |
-| Rozbudowana polityka certyfikacji | ❌ |
-| Obsługa wielu poziomów CA, np. Intermediate CA | ⚠️ |
-| Rozszerzona walidacja pól CSR | ⚠️ |
-| Produkcyjne zarządzanie kluczami prywatnymi | ⚠️ |
-| Generowanie certyfikatów z formularza jako tryb produkcyjny | ⚠️ |
+| Klucz Root CA | Przechowywany w pliku na wolumenie Docker (brak HSM) |
+| Klucze użytkowników | Generowane na serwerze w trybie `issue-for-user` |
+| OCSP | Nie zaimplementowano — tylko CRL |
+| Intermediate CA | Brak wielopoziomowego łańcucha |
+| TSA | Znacznik czasu podpisywany kluczem użytkownika (demo) |
 
-Aplikacja została przygotowana jako projekt edukacyjny, dlatego część decyzji została świadomie uproszczona. Najlepszym przykładem jest tryb generowania certyfikatu z formularza, w którym backend zwraca także klucz prywatny, co ułatwia prezentację działania systemu, ale nie powinno być traktowane jako wzorzec dla środowiska produkcyjnego.
-
-## Uwagi techniczne
-
-- Backend wykorzystuje pola `not_valid_before_utc` oraz `not_valid_after_utc`, co eliminuje ostrzeżenia deprecacyjne biblioteki `cryptography`.
-- Komunikacja frontend-backend jest realizowana przez plik `api.ts`, który mapuje wywołania interfejsu użytkownika na endpointy FastAPI.
-- Docker Compose uruchamia cały system lokalnie jako trzy współpracujące kontenery: bazę danych, backend i frontend.
-- Logika biznesowa i kryptograficzna została skupiona po stronie backendu w Pythonie, dzięki czemu frontend pozostaje prostym klientem administracyjnym.
+Projekt ma charakter **edukacyjny** — demonstruje przepływ PKI, nie jest gotowy do produkcji.
 
 ## Możliwe rozszerzenia
 
-- dodanie Intermediate CA i łańcucha certyfikacji,
-- obsługa list CRL lub mechanizmu OCSP,
-- eksport certyfikatu i klucza jako archiwum ZIP,
-- dodatkowa walidacja atrybutów Subject i Subject Alternative Name,
-- autoryzacja dostępu do panelu administracyjnego,
-- audyt operacji administracyjnych, np. kto wystawił lub unieważnił certyfikat.
+- Intermediate CA i pełny łańcuch certyfikacji,
+- OCSP responder,
+- eksport PKCS#12,
+- zewnętrzny TSA (RFC 3161),
+- przechowywanie kluczy w HSM / Vault.

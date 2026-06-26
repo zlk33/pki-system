@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, CertRequest } from '../api'
 
 export default function Requests() {
@@ -15,7 +15,6 @@ export default function Requests() {
 
   const load = async () => {
     setLoading(true)
-    setError('')
     try {
       const data = await api.getRequests()
       setRequests(data)
@@ -26,23 +25,20 @@ export default function Requests() {
     }
   }
 
-  useEffect(() => {
-    load()
-  }, [])
+  useEffect(() => { load() }, [])
 
-  const handleSubmitCSR = async (e: FormEvent) => {
+  const handleSubmitCSR = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitLoading(true)
     setMsg('')
-    setError('')
     try {
       const res = await api.submitCSR(csrForm)
       setMsg(res.message)
       setCsrForm({ common_name: '', csr_pem_data: '' })
       setTab('list')
-      await load()
+      load()
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Błąd wysyłania')
+      setMsg(e instanceof Error ? e.message : 'Błąd wysyłania')
     } finally {
       setSubmitLoading(false)
     }
@@ -50,14 +46,12 @@ export default function Requests() {
 
   const handleAction = async (id: number, action: 'approve' | 'reject') => {
     setActionLoading(id)
-    setMsg('')
-    setError('')
     try {
       const res = action === 'approve' ? await api.approveRequest(id) : await api.rejectRequest(id)
       setMsg(res.message)
-      await load()
+      load()
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Błąd operacji')
+      setMsg(e instanceof Error ? e.message : 'Błąd operacji')
     } finally {
       setActionLoading(null)
     }
@@ -67,45 +61,17 @@ export default function Requests() {
     <div>
       <div className="page-header">
         <h2>Żądania CSR</h2>
-        <p>Zarządzanie żądaniami podpisania certyfikatów.</p>
+        <p>Zarządzanie żądaniami podpisania certyfikatów</p>
       </div>
 
       {msg && <div className="alert alert-success">{msg}</div>}
       {error && <div className="alert alert-error">{error}</div>}
 
-      <div
-        style={{
-          display: 'inline-flex',
-          gap: 8,
-          marginBottom: 20,
-          padding: 6,
-          borderRadius: 12,
-          background: 'var(--surface-alt)',
-          border: '1px solid var(--border)',
-        }}
-      >
-        <button
-          type="button"
-          className="btn"
-          onClick={() => setTab('list')}
-          style={{
-            background: tab === 'list' ? 'var(--primary)' : 'transparent',
-            color: tab === 'list' ? 'white' : 'var(--text)',
-            boxShadow: tab === 'list' ? 'var(--shadow-sm)' : 'none',
-          }}
-        >
+      <div className="tab-bar">
+        <button className={`btn ${tab === 'list' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setTab('list')}>
           Lista żądań
         </button>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => setTab('submit')}
-          style={{
-            background: tab === 'submit' ? 'var(--primary)' : 'transparent',
-            color: tab === 'submit' ? 'white' : 'var(--text)',
-            boxShadow: tab === 'submit' ? 'var(--shadow-sm)' : 'none',
-          }}
-        >
+        <button className={`btn ${tab === 'submit' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setTab('submit')}>
           Prześlij CSR
         </button>
       </div>
@@ -115,9 +81,7 @@ export default function Requests() {
           {loading ? (
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Ładowanie...</div>
           ) : requests.length === 0 ? (
-            <div className="empty-state">
-              <p>Brak żądań CSR.</p>
-            </div>
+            <div className="empty-state"><p>Brak żądań CSR</p></div>
           ) : (
             <div className="table-wrap">
               <table>
@@ -130,26 +94,21 @@ export default function Requests() {
                   </tr>
                 </thead>
                 <tbody>
-                  {requests.map((r) => (
+                  {requests.map(r => (
                     <tr key={r.id}>
                       <td style={{ fontWeight: 500 }}>{r.common_name}</td>
+                      <td><span className={`badge badge-${r.status.toLowerCase()}`}>{r.status}</span></td>
+                      <td style={{ color: 'var(--text-muted)' }}>{new Date(r.created_at).toLocaleString('pl-PL')}</td>
                       <td>
-                        <span className={`badge badge-${String(r.status).toLowerCase()}`}>{r.status}</span>
-                      </td>
-                      <td style={{ color: 'var(--text-muted)' }}>
-                        {r.created_at ? new Date(r.created_at).toLocaleString('pl-PL') : '—'}
-                      </td>
-                      <td>
-                        {r.status === 'PENDING' ? (
-                          <div className="actions" style={{ gap: 8, flexWrap: 'wrap' }}>
+                        {r.status === 'PENDING' && (
+                          <div className="actions">
                             <button
                               className="btn btn-primary"
                               style={{ fontSize: 12, padding: '6px 12px' }}
                               disabled={actionLoading === r.id}
                               onClick={() => handleAction(r.id, 'approve')}
                             >
-                              {actionLoading === r.id ? <span className="spinner" /> : null}
-                              Zatwierdź
+                              {actionLoading === r.id ? <span className="spinner" /> : 'Zatwierdź'}
                             </button>
                             <button
                               className="btn btn-danger"
@@ -160,8 +119,6 @@ export default function Requests() {
                               Odrzuć
                             </button>
                           </div>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
                         )}
                       </td>
                     </tr>
@@ -182,23 +139,21 @@ export default function Requests() {
               <input
                 placeholder="np. example.com"
                 value={csrForm.common_name}
-                onChange={(e) => setCsrForm((f) => ({ ...f, common_name: e.target.value }))}
+                onChange={e => setCsrForm(f => ({ ...f, common_name: e.target.value }))}
                 required
               />
             </div>
-
             <div className="form-group">
               <label>CSR (PEM)</label>
               <textarea
                 rows={10}
-                placeholder={`-----BEGIN CERTIFICATE REQUEST-----\n...\n-----END CERTIFICATE REQUEST-----`}
+                placeholder="-----BEGIN CERTIFICATE REQUEST-----&#10;...&#10;-----END CERTIFICATE REQUEST-----"
                 value={csrForm.csr_pem_data}
-                onChange={(e) => setCsrForm((f) => ({ ...f, csr_pem_data: e.target.value }))}
+                onChange={e => setCsrForm(f => ({ ...f, csr_pem_data: e.target.value }))}
                 required
                 style={{ resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }}
               />
             </div>
-
             <button type="submit" className="btn btn-primary" disabled={submitLoading}>
               {submitLoading ? <span className="spinner" /> : null}
               Prześlij CSR

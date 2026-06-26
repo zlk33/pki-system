@@ -2,12 +2,21 @@
 fastapi==0.110.0
 uvicorn==0.29.0
 
-# Baza danych i ORM (najlepszy duet do FastAPI)
+# Baza danych i ORM
 sqlalchemy==2.0.29
 psycopg2-binary==2.9.9
 
-# Logika PKI (generowanie kluczy i certyfikatów)
+# Logika PKI
 cryptography==42.0.5
 
-# Zmienne środowiskowe (.env)
+# Zmienne środowiskowe
 python-dotenv==1.0.1
+
+# Auth i walidacja
+email-validator==2.1.1
+python-jose[cryptography]==3.5.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.1.2
+
+# Upload plików
+python-multipart==0.0.9
