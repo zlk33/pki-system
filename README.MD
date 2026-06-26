@@ -41,11 +41,11 @@ Główna logika kryptograficzna i biznesowa jest zaimplementowana w **Pythonie**
 ```
 ┌─────────────┐     REST + JWT      ┌──────────────┐     SQL      ┌────────────┐
 │  Frontend   │ ◄─────────────────► │   Backend    │ ◄──────────► │ PostgreSQL │
-│  Next.js    │   localhost:8000  │   FastAPI    │              │            │
-│  :3000      │                   │   Python     │              │            │
-└─────────────┘                   └──────┬───────┘              └────────────┘
-                                         │
-                                  /app/certs (wolumen Docker)
+│  Next.js    │   localhost:8000    │   FastAPI    │              │            │
+│  :3000      │                     │   Python     │              │            │
+└─────────────┘                     └──────┬───────┘              └────────────┘
+                                           │
+                                    /app/certs (wolumen Docker)
 ```
 
 | Usługa | Technologia | Port | Rola |
