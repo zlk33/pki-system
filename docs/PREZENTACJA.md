@@ -10,12 +10,19 @@
 **Studenckie PKI**  
 System zarządzania infrastrukturą klucza publicznego
 
-- Autor: *[Twoje imię i nazwisko]*
-- Przedmiot: *[nazwa przedmiotu]*
+**Zespół projektowy:**
+- Jakub Zalewski
+- Hubert Rachwalik
+- Jakub Zaborski
+- Mateusz Rutkowski
+- Michał Dęby
+- Robert Graff
+- Wojciech Bojko
+
 - Stack: Python (FastAPI) + PostgreSQL + Next.js + Docker
 
 **Co powiedzieć:**  
-Przedstawiam projekt edukacyjnego PKI — od utworzenia urzędu certyfikacji, przez wystawianie certyfikatów użytkownikom, po podpisywanie i weryfikację dokumentów.
+Przedstawiamy projekt edukacyjnego PKI — od utworzenia urzędu certyfikacji, przez wystawianie certyfikatów użytkownikom, po podpisywanie i weryfikację dokumentów.
 
 ---
 

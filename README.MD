@@ -4,6 +4,8 @@ Edukacyjny system zarządzania infrastrukturą klucza publicznego (PKI) z panele
 
 **Stack:** Python (FastAPI) + PostgreSQL + Next.js + Docker
 
+**Zespół projektowy:** Jakub Zalewski, Hubert Rachwalik, Jakub Zaborski, Mateusz Rutkowski, Michał Dęby, Robert Graff, Wojciech Bojko
+
 Główna logika kryptograficzna i biznesowa jest zaimplementowana w **Pythonie** (`cryptography`, SQLAlchemy). Frontend pełni rolę panelu użytkownika i administratora.
 
 ## Funkcjonalności
@@ -194,8 +196,28 @@ W repozytorium znajdują się materiały do obrony projektu:
 
 | Plik | Opis |
 | --- | --- |
-| `docs/PREZENTACJA.md` | Prezentacja ze skryptem do wygłoszenia (16 slajdów) |
+| `docs/PREZENTACJA.md` | Skrypt do wygłoszenia (16 slajdów) |
+| `scripts/generate_presentation.py` | Generator prezentacji **PPTX** ze slajdami i miejscami na zdjęcia |
 | `scripts/generate_documentation.py` | Generator HTML + PDF ze strukturą i kodem wszystkich plików |
+
+### Generowanie prezentacji PPTX
+
+**Windows (dwuklik):**
+
+```text
+scripts\generate_presentation.bat
+```
+
+**Ręcznie:**
+
+```bash
+pip install -r scripts/requirements-docs.txt
+python scripts/generate_presentation.py
+```
+
+Wynik: `docs/generated/studenckie-pki-prezentacja.pptx`
+
+Otwórz plik w PowerPoint, kliknij szare pole po prawej stronie slajdu i wstaw zdjęcie / zrzut ekranu. Notatki do wygłoszenia są w zakładce **Notatki** pod każdym slajdem.
 
 ### Generowanie PDF z kodem źródłowym
 
@@ -205,19 +227,29 @@ W repozytorium znajdują się materiały do obrony projektu:
 scripts\generate_documentation.bat
 ```
 
-**Ręcznie:**
+**Ręcznie (krok po kroku):**
+
+1. Otwórz terminal w katalogu projektu (`C:\uth\pki-system`).
+2. Zainstaluj zależności (jednorazowo):
 
 ```bash
 pip install -r scripts/requirements-docs.txt
+```
+
+3. Uruchom generator:
+
+```bash
 python scripts/generate_documentation.py
 ```
 
 Wynik:
 
-- `docs/generated/studenckie-pki-dokumentacja.html` — pełna dokumentacja (prezentacja + README + drzewo plików + kod)
-- `docs/generated/studenckie-pki-dokumentacja.pdf` — wersja PDF (wymaga `fpdf2`)
+- `docs/generated/studenckie-pki-dokumentacja.html` — pełna dokumentacja (prezentacja + README + drzewo plików + kod każdego pliku)
+- `docs/generated/studenckie-pki-dokumentacja.pdf` — wersja PDF (automatycznie, jeśli działa `fpdf2` lub przeglądarka Edge/Chrome)
 
-Jeśli PDF nie powstanie automatycznie, otwórz plik HTML w przeglądarce i użyj **Ctrl+P → Zapisz jako PDF**.
+**Jeśli PDF nie powstanie automatycznie:** otwórz plik `.html` w przeglądarce → **Ctrl+P** → wybierz „Zapisz jako PDF” → Zapisz.
+
+**Wymagania:** Python 3.10+ (zainstalowany i dostępny jako `python` w PATH).
 
 ## Zaimplementowane funkcjonalności
 
